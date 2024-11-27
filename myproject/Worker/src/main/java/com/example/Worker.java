@@ -1,3 +1,5 @@
+package com.example;
+
 import java.io.BufferedReader;          //need to update dependencies
 import java.io.FileReader;
 import java.io.IOException;
