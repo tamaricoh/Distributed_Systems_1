@@ -51,61 +51,11 @@ public class LocalApplication {
             String summaryFileName = checkSQSQueue(); // Get the summary file name
             System.out.println("Manager Response: " + summaryFileName);
 
-            // Creates an html file representing the results.
-            generateHtmlSummary(outputFileName, summaryFileName);
+            HTMLConverter.generateHtmlFromTxt(summaryFileName, outputFileName);
     
         } catch (IOException e) {
             System.err.println("Error processing file: " + e.getMessage());
         }
-    }
-    
-
-    public static void generateHtmlSummary(String outputFileName, String summaryFileName) throws IOException {
-        // Read the summary file content
-        File summaryFile = new File(summaryFileName);
-        if (!summaryFile.exists()) {
-            throw new FileNotFoundException("Summary file not found: " + summaryFileName);
-        }
-        
-        Scanner scanner = new Scanner(summaryFile);
-        StringBuilder content = new StringBuilder();
-    
-        while (scanner.hasNextLine()) {
-            String line = scanner.nextLine();
-    
-            try {
-                // Parse the line for operation, input file, and output file or exception
-                String[] parts = line.split(",");
-                String operation = parts[0].trim();
-                String inputFile = parts[1].trim();
-                String outputFileOrError = parts.length > 2 ? parts[2].trim() : "Unknown error";
-    
-                // Create HTML link tags for input and output files
-                String inputLink = "<a href=\"" + inputFile + "\">" + inputFile + "</a>";
-                String outputLink = outputFileOrError.contains("error") ? outputFileOrError
-                        : "<a href=\"" + outputFileOrError + "\">" + outputFileOrError + "</a>";
-    
-                // Append the formatted line to the content
-                content.append("<p>")
-                       .append(operation).append(": ")
-                       .append(inputLink).append(" ")
-                       .append(outputLink)
-                       .append("</p>\n");
-            } catch (Exception e) {
-                // If an error occurs while processing the line, handle gracefully
-                content.append("<p>Error processing line: ").append(line).append("</p>\n");
-            }
-        }
-        scanner.close();
-    
-        // Generate the HTML file
-        BufferedWriter writer = new BufferedWriter(new FileWriter(outputFileName));
-        writer.write("<html><body><h1>Processed File Summary</h1>");
-        writer.write(content.toString());
-        writer.write("</body></html>");
-        writer.close();
-    
-        System.out.println("HTML summary created: " + outputFileName);
     }
     
 
