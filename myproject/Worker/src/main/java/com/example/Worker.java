@@ -28,8 +28,10 @@ public class Worker implements Runnable {
             int linesProcessed = 0; //good for debugging
             long startTime = System.currentTimeMillis();
             while (linesProcessed < this.n) {
+                System.out.println("proccesing line - " + linesProcessed);
                 String line = reader.readLine();
                 if (line == null) {
+                    System.out.println("end of input file");
                     terminate();
                 }
 
@@ -46,14 +48,11 @@ public class Worker implements Runnable {
                 processUrls(operationCode, url, outputUrl);
 
                 linesProcessed++;
-                if (startTime + timeout >= System.currentTimeMillis()){
-                    terminate();
-                }
             }
             
             System.out.println("Worker completed processing " + linesProcessed + " lines.");
         } catch (IOException e) {
-            System.out.println("do somthing about worker getting inturrpted");
+            System.err.println("Error reading input file: " + e.getMessage());
         }
     }
 
@@ -66,4 +65,3 @@ public class Worker implements Runnable {
         this.n = 0;
     }
 }
-
