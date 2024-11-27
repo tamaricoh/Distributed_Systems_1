@@ -16,7 +16,7 @@ public class Manager implements Runnable {
         this.inputFilePath = inputFilePath;
         this.linesPerWorker = linesPerWorker;
         this.workerTimeout = workerTimeout;
-        this.threadPool = Executors.newCachedThreadPool(); // Dynamically allocate threads
+        this.threadPool = Executors.newCachedThreadPool();
     }
 
     @Override
@@ -40,7 +40,7 @@ public class Manager implements Runnable {
         String[] batch;
 
         while ((batch = readNextBatch(reader)) != null) {
-            submitWorkerTask(batch, startPosition);
+            submitWorkerTask(startPosition, linesPerWorker);
             startPosition += batch.length;
         }
     }
@@ -94,20 +94,5 @@ public class Manager implements Runnable {
     private void terminateManager() {
         System.out.println("Shutting down Manager...");
         threadPool.shutdown();
-    }
-
-    // Main method for local execution
-    public static void main(String[] args) {
-        if (args.length < 3) {
-            System.out.println("Usage: java Manager <inputFilePath> <linesPerWorker> <workerTimeout>");
-            return;
-        }
-
-        String inputFilePath = args[0];
-        int linesPerWorker = Integer.parseInt(args[1]);
-        long workerTimeout = Long.parseLong(args[2]);
-
-        Manager manager = new Manager(inputFilePath, linesPerWorker, workerTimeout);
-        new Thread(manager).start();
     }
 }
