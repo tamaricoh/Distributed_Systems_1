@@ -1,10 +1,12 @@
+package com.example;
+
 import java.io.BufferedReader;          //need to update dependencies
 import java.io.FileReader;
 import java.io.IOException;
 
 public class Worker implements Runnable {
     private final String inputFilePath; // Path to the input file
-    private final int n;         // Number of lines to process
+    private final int n;                // Number of lines to process
     private final int startPosition;    // Starting line position
     private final long timeout;         // Timeout in milliseconds
 
@@ -44,18 +46,20 @@ public class Worker implements Runnable {
                 processUrls(operationCode, url, outputUrl);
 
                 linesProcessed++;
+                if (startTime + timeout >= System.currentTimeMillis()){
+                    terminate();
+                }
             }
 
             System.out.println("Worker completed processing " + linesProcessed + " lines.");
         } catch (IOException e) {
-            System.err.println("Error reading input file: " + e.getMessage());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            System.err.println("Worker interrupted: " + e.getMessage());
+            System.out.println("do somthing about worker getting inturrpted");
         }
     }
 
     private void processUrls(String operationCode, String url, String outputUrl) {
     }
-}
 
+    private void terminate() {
+    }
+}
