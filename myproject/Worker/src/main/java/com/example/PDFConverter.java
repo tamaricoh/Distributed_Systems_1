@@ -53,32 +53,44 @@ public class PDFConverter {
         File tempPdf = File.createTempFile("downloaded", ".pdf");
         tempPdf.deleteOnExit();
     
-        // Download PDF
-        try (java.io.InputStream in = url.openStream()) {
-            java.nio.file.Files.copy(in, tempPdf.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        try {
+            // Download PDF
+            try (java.io.InputStream in = url.openStream()) {
+                java.nio.file.Files.copy(in, tempPdf.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+    
+            String baseFileName = tempPdf.getAbsolutePath().replace(".pdf", "");
+            String outputPath;
+    
+            // Handle different operations
+            switch (operation.toUpperCase()) {
+                case "TOIMAGE":
+                    outputPath = baseFileName + ".png";
+                    convertToImage(tempPdf.getAbsolutePath(), outputPath);
+                    break;
+                case "TOTEXT":
+                    outputPath = baseFileName + ".txt";
+                    convertToText(tempPdf.getAbsolutePath(), outputPath);
+                    break;
+                case "TOHTML":
+                    outputPath = baseFileName + ".html";
+                    try {
+                        convertToHTML(tempPdf.getAbsolutePath(), outputPath);
+                    } catch (IOException e) {
+                        // Return an error message when HTML conversion fails
+                        return "Error: Unable to convert PDF to HTML. Reason: " + e.getMessage();
+                    }
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unsupported operation: " + operation);
+            }
+    
+            // Return the URL of the output file
+            return new File(outputPath).toURI().toString();
+    
+        } catch (IOException e) {
+            // Catch any IOException, including file download or conversion issues
+            return "Error: Unable to download or process PDF. Reason: " + e.getMessage();
         }
-    
-        String baseFileName = tempPdf.getAbsolutePath().replace(".pdf", "");
-        String outputPath;
-    
-        switch(operation.toUpperCase()) {
-            case "TOIMAGE":
-                outputPath = baseFileName + ".png";
-                convertToImage(tempPdf.getAbsolutePath(), outputPath);
-                break;
-            case "TOTEXT":
-                outputPath = baseFileName + ".txt";
-                convertToText(tempPdf.getAbsolutePath(), outputPath);
-                break;
-            case "TOHTML":
-                outputPath = baseFileName + ".html";
-                convertToHTML(tempPdf.getAbsolutePath(), outputPath);
-                break;
-            default:
-                throw new IllegalArgumentException("Unsupported operation: " + operation);
-        }
-    
-        // Return the URL of the output file
-        return new File(outputPath).toURI().toString();
     }
 }
