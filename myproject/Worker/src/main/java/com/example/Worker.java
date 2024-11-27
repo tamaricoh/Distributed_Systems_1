@@ -1,4 +1,3 @@
-package com.example;
 import java.io.BufferedReader;          //need to update dependencies
 import java.io.FileReader;
 import java.io.IOException;
@@ -52,10 +51,7 @@ public class Worker implements Runnable {
 
             System.out.println("Worker completed processing " + linesProcessed + " lines.");
         } catch (IOException e) {
-            System.err.println("Error reading input file: " + e.getMessage());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            System.err.println("Worker interrupted: " + e.getMessage());
+            System.out.println("do somthing about worker getting inturrpted");
         }
     }
 
@@ -65,3 +61,4 @@ public class Worker implements Runnable {
     private void terminate() {
     }
 }
+
