@@ -6,7 +6,7 @@ import java.io.IOException;
 
 public class Worker implements Runnable {
     private final String inputFilePath; // Path to the input file
-    private final int n;                // Number of lines to process
+    private int n;                // Number of lines to process
     private final int startPosition;    // Starting line position
     private final long timeout;         // Timeout in milliseconds
 
@@ -30,9 +30,9 @@ public class Worker implements Runnable {
             while (linesProcessed < this.n) {
                 String line = reader.readLine();
                 if (line == null) {
-                    // End of file reached
-                    break;
+                    terminate();
                 }
+
 
                 // Parse line: <operation code> <url>
                 String[] parts = line.split("\\s+");
@@ -50,7 +50,7 @@ public class Worker implements Runnable {
                     terminate();
                 }
             }
-
+            
             System.out.println("Worker completed processing " + linesProcessed + " lines.");
         } catch (IOException e) {
             System.out.println("do somthing about worker getting inturrpted");
@@ -58,9 +58,12 @@ public class Worker implements Runnable {
     }
 
     private void processUrls(String operationCode, String url, String outputUrl) {
+        String outputLine = operationCode + " " + url + " " + outputUrl;
+        System.out.println(outputLine);
     }
 
     private void terminate() {
+        this.n = 0;
     }
 }
 
