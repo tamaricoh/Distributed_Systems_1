@@ -43,22 +43,32 @@ public class AWS {
 
     private static final AWS instance = new AWS();
 
+    // Constructor initializes S3, SQS, and EC2 clients with the default region.
     private AWS() {
         s3 = S3Client.builder().region(region1).build();
         sqs = SqsClient.builder().region(region1).build();
         ec2 = Ec2Client.builder().region(region1).build();
     }
 
+    /**
+     * Provides a singleton instance of the AWS utility class.
+     *
+     * @return Singleton instance of AWS.
+     */
     public static AWS getInstance() {
         return instance;
     }
 
     public String bucketName = "text_file_bucket";
 
-
-    // S3
+    /**
+     * Creates an S3 bucket if it does not already exist.
+     *
+     * @param bucketName Name of the bucket to create.
+     */
     public void createBucketIfNotExists(String bucketName) {
         try {
+            // Create the bucket with the specified configuration
             s3.createBucket(CreateBucketRequest
                     .builder()
                     .bucket(bucketName)
@@ -67,6 +77,8 @@ public class AWS {
                                     .locationConstraint(BucketLocationConstraint.US_WEST_2)
                                     .build())
                     .build());
+
+            // Wait until the bucket exists
             s3.waiter().waitUntilBucketExists(HeadBucketRequest.builder()
                     .bucket(bucketName)
                     .build());
@@ -75,10 +87,19 @@ public class AWS {
         }
     }
 
-    // EC2
+    /**
+     * Launches an EC2 instance with the specified script, tag, and number of instances.
+     *
+     * @param script           User-data script for the instance.
+     * @param tagName          Name tag for the instance.
+     * @param numberOfInstances Number of instances to launch.
+     * @return Instance ID of the first launched instance.
+     */
     public String createEC2(String script, String tagName, int numberOfInstances) {
         Ec2Client ec2 = Ec2Client.builder().region(region2).build();
-        RunInstancesRequest runRequest = (RunInstancesRequest) RunInstancesRequest.builder()
+
+        // Configure the instance launch request
+        RunInstancesRequest runRequest = RunInstancesRequest.builder()
                 .instanceType(InstanceType.M4_LARGE)
                 .imageId(ami)
                 .maxCount(numberOfInstances)
@@ -88,27 +109,22 @@ public class AWS {
                 .userData(Base64.getEncoder().encodeToString((script).getBytes()))
                 .build();
 
-
+        // Launch the instances
         RunInstancesResponse response = ec2.runInstances(runRequest);
-
         String instanceId = response.instances().get(0).instanceId();
 
-        software.amazon.awssdk.services.ec2.model.Tag tag = Tag.builder()
-                .key("Name")
-                .value(tagName)
-                .build();
-
-        CreateTagsRequest tagRequest = (CreateTagsRequest) CreateTagsRequest.builder()
+        // Tag the instance with the provided tag
+        CreateTagsRequest tagRequest = CreateTagsRequest.builder()
                 .resources(instanceId)
-                .tags(tag)
+                .tags(Tag.builder()
+                        .key("Name")
+                        .value(tagName)
+                        .build())
                 .build();
 
         try {
             ec2.createTags(tagRequest);
-            System.out.printf(
-                    "[DEBUG] Successfully started EC2 instance %s based on AMI %s\n",
-                    instanceId, ami);
-
+            System.out.printf("[DEBUG] Successfully started EC2 instance %s based on AMI %s\n", instanceId, ami);
         } catch (Ec2Exception e) {
             System.err.println("[ERROR] " + e.getMessage());
             System.exit(1);
@@ -116,7 +132,11 @@ public class AWS {
         return instanceId;
     }
 
-    //SQS
+    /**
+     * Creates an SQS queue with the specified name.
+     *
+     * @param queueName Name of the queue to create.
+     */
     public void createSqsQueue(String queueName) {
         CreateQueueRequest createQueueRequest = CreateQueueRequest.builder()
                 .queueName(queueName)
@@ -124,10 +144,15 @@ public class AWS {
         sqs.createQueue(createQueueRequest);
     }
 
-    // Sends a message to an SQS queue, stating the location of the file on S3
+    /**
+     * Sends a message to the specified SQS queue.
+     *
+     * @param message   Content of the message.
+     * @param queueName Name of the SQS queue.
+     */
     public static void sendSQSMessage(String message, String queueName) {
         try {
-            // Get the queue URL
+            // Retrieve the queue URL
             GetQueueUrlRequest getQueueUrlRequest = GetQueueUrlRequest.builder()
                     .queueName(queueName)
                     .build();
@@ -135,25 +160,28 @@ public class AWS {
             GetQueueUrlResponse queueUrlResponse = getInstance().sqs.getQueueUrl(getQueueUrlRequest);
             String queueUrl = queueUrlResponse.queueUrl();
 
-            // Send the message with the file location
+            // Send the message
             SendMessageRequest sendMessageRequest = SendMessageRequest.builder()
                     .queueUrl(queueUrl)
                     .messageBody(message)
                     .build();
             getInstance().sqs.sendMessage(sendMessageRequest);
-            // Location of file or terminate
-            System.out.println("SQS Message Sent:" + message);
 
+            System.out.println("SQS Message Sent: " + message);
         } catch (SqsException e) {
             System.err.println("Error sending SQS message: " + e.awsErrorDetails().errorMessage());
         }
     }
 
-    // Checks an SQS queue for a message indicating the process is done and the response (the summary file) is available on S3.
-    // Extracts the number of summary files from the message body.
+    /**
+     * Checks the specified SQS queue for a message indicating processing completion.
+     *
+     * @param queueName Name of the SQS queue.
+     * @return Number of summary files mentioned in the message, or -1 if no valid message is found.
+     */
     public static int checkSQSQueue(String queueName) {
         try {
-            // Get the queue URL
+            // Retrieve the queue URL
             GetQueueUrlRequest getQueueUrlRequest = GetQueueUrlRequest.builder()
                     .queueName(queueName)
                     .build();
@@ -161,43 +189,44 @@ public class AWS {
             GetQueueUrlResponse queueUrlResponse = getInstance().sqs.getQueueUrl(getQueueUrlRequest);
             String queueUrl = queueUrlResponse.queueUrl();
 
-            // Receive messages from the queue
+            // Receive a message
             ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder()
                     .queueUrl(queueUrl)
-                    .maxNumberOfMessages(1)  // Only retrieve one message at a time
+                    .maxNumberOfMessages(1)
                     .build();
 
             ReceiveMessageResponse receiveMessageResponse = getInstance().sqs.receiveMessage(receiveMessageRequest);
 
             if (!receiveMessageResponse.messages().isEmpty()) {
-                // Get the message body
                 String messageBody = receiveMessageResponse.messages().get(0).body();
                 System.out.println("Message received: " + messageBody);
 
-                // Assuming the message contains the number of summary files in the format:
-                // "Process is complete. There are NUM summary files ready for you."
                 String[] parts = messageBody.split(" ");
                 if (parts.length > 5) {
                     try {
-                        return Integer.parseInt(parts[5]); // Extract the NUM part of the message
+                        return Integer.parseInt(parts[5]);
                     } catch (NumberFormatException e) {
                         System.err.println("Error extracting number from message.");
                     }
                 }
             }
-
         } catch (SqsException e) {
             System.err.println("Error checking SQS queue: " + e.awsErrorDetails().errorMessage());
         }
-        return -1;  // Return -1 if no valid message is found
+        return -1;
     }
 
-    // Uploads the file to S3 - returns the file path if the upload succeeds or null if it fails.
+    /**
+     * Uploads a file to S3 and returns the object key.
+     *
+     * @param inputFileName Local path of the file to upload.
+     * @param bucketName    Name of the S3 bucket.
+     * @return The key of the uploaded file in S3, or null if the upload fails.
+     * @throws IOException If an I/O error occurs.
+     */
     public static String uploadFileToS3(String inputFileName, String bucketName) throws IOException {
-        // Create the S3 object key (you can use any naming strategy)
         String s3Key = Paths.get(inputFileName).getFileName().toString();
-        
-        // Upload the file
+
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(bucketName)
@@ -213,5 +242,4 @@ public class AWS {
             return null;
         }
     }
-
 }
