@@ -16,6 +16,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.BucketLocationConstraint;
 import software.amazon.awssdk.services.s3.model.CreateBucketConfiguration;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
@@ -175,11 +176,13 @@ public class AWS {
 
     /**
      * Checks the specified SQS queue for a message indicating processing completion.
+     * The message format should be a JSON string in the form <inputfile>:::<file_location_in_S3>.
      *
      * @param queueName Name of the SQS queue.
-     * @return Number of summary files mentioned in the message, or -1 if no valid message is found.
+     * @param inputfile Name of the uploaded file.
+     * @return the processed file location in S3 as a String, or "FileNotFound" if no matching message is found.
      */
-    public static int checkSQSQueue(String queueName) {
+    public String checkSQSQueue(String queueName, String inputfile) {
         try {
             // Retrieve the queue URL
             GetQueueUrlRequest getQueueUrlRequest = GetQueueUrlRequest.builder()
@@ -189,31 +192,26 @@ public class AWS {
             GetQueueUrlResponse queueUrlResponse = getInstance().sqs.getQueueUrl(getQueueUrlRequest);
             String queueUrl = queueUrlResponse.queueUrl();
 
-            // Receive a message
+            // Receive up to 10 messages
             ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder()
                     .queueUrl(queueUrl)
-                    .maxNumberOfMessages(1)
+                    .maxNumberOfMessages(10)
                     .build();
 
             ReceiveMessageResponse receiveMessageResponse = getInstance().sqs.receiveMessage(receiveMessageRequest);
 
-            if (!receiveMessageResponse.messages().isEmpty()) {
-                String messageBody = receiveMessageResponse.messages().get(0).body();
-                System.out.println("Message received: " + messageBody);
-
-                String[] parts = messageBody.split(" ");
-                if (parts.length > 5) {
-                    try {
-                        return Integer.parseInt(parts[5]);
-                    } catch (NumberFormatException e) {
-                        System.err.println("Error extracting number from message.");
-                    }
+            // Loop through the received messages
+            for (var message : receiveMessageResponse.messages()) {
+                String messageBody = message.body();
+                String[] parts = messageBody.split(":::");
+                if (parts[0].contentEquals(inputfile)) {
+                    return parts[1];
                 }
             }
         } catch (SqsException e) {
             System.err.println("Error checking SQS queue: " + e.awsErrorDetails().errorMessage());
         }
-        return -1;
+        return "FileNotFound"; // Return this if no matching message is found
     }
 
     /**
@@ -224,7 +222,7 @@ public class AWS {
      * @return The key of the uploaded file in S3, or null if the upload fails.
      * @throws IOException If an I/O error occurs.
      */
-    public static String uploadFileToS3(String inputFileName, String bucketName) throws IOException {
+    public String uploadFileToS3(String inputFileName, String bucketName) {
         String s3Key = Paths.get(inputFileName).getFileName().toString();
 
         try {
@@ -237,9 +235,40 @@ public class AWS {
             getInstance().s3.putObject(putObjectRequest, path);
             System.out.println("File uploaded successfully to S3: " + s3Key);
             return s3Key;
-        } catch (S3Exception e) {
-            System.err.println("Error uploading file to S3: " + e.awsErrorDetails().errorMessage());
+        } catch (Exception e) {
+            System.err.println("Unexpected error during file upload: " + e.getMessage());
             return null;
         }
     }
+
+
+    /**
+     * Downloads a file from an S3 bucket to the local system.
+     *
+     * @param bucketName The name of the S3 bucket containing the file.
+     * @param fileKey    The key (name) of the file in the S3 bucket.
+     * @param outputFilePath The local file path where the downloaded file will be saved.
+     * @return true if the download is successful, false otherwise.
+     * @throws IOException If an I/O error occurs during the file save process.
+     */
+    public boolean downloadFileFromS3(String bucketName, String fileKey, String outputFilePath) {
+        try {
+            // Create a GetObjectRequest to specify the bucket and key
+            GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(fileKey)
+                    .build();
+
+            // Perform the file download
+            getInstance().s3.getObject(getObjectRequest, Paths.get(outputFilePath));
+
+            System.out.println("File downloaded successfully from S3: " + fileKey + " to " + outputFilePath);
+            return true;
+        } catch (Exception e) {
+            System.err.println("Unexpected error during file download: " + e.getMessage());
+            return false;
+        }
+    }
+
+
 }

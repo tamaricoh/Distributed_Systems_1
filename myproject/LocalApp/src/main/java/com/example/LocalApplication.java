@@ -1,79 +1,49 @@
 package com.example;
 
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
-import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.s3.model.*;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.sqs.model.*;
-import software.amazon.awssdk.services.sqs.SqsClient;
-
-import java.io.IOException;
-// import java.nio.file.Files;
-import java.nio.file.Paths;
-// import java.nio.file.StandardCopyOption;
-import java.nio.file.Path;
-
 public class LocalApplication{
+    static String BUCKET_NAME = "Text_File_Bucket";
+    static String SQS_CLIENT = "Client2Manager";
+    static String SQS_READY = "Manager2Client";
+    static AWS aws = AWS.getInstance();
+    static String dilimeter = ":::";
 
     // Method to process the file
-    public static void processFile(String inputFileName, String outputFileName, int n) {
-        try {
-
-            // Checks if a Manager node is active on the EC2 cloud.
-            // If it is not, the application will start the manager node.
-            // Manager manager = new Manager(inputFileName, n, 50000);
-
-            // Uploads the file to S3.
-            String uploadedFilePath = uploadFileToS3(inputFileName);
-            if (uploadedFilePath == null) {
-                return;
+    public static void processFile(String inputFilePath, String outputFilePath) {
+        HTMLConverter htmlConverter = new HTMLConverter(inputFilePath, outputFilePath);
+        htmlConverter.convertToHTML();
+        System.out.println("Successfully Converted the input file, you can find the outcome at : " + outputFilePath);
+    }
+    //TODO::while listening to the sqsqueue should check if a termination message message received and handle accordingly.
+    public static String listen(String filePath, AWS awsTool, String queueName){
+        String summaryFileName = "FileNotFound";
+        while (summaryFileName.contentEquals("FileNotFound")) {
+            try {
+                Thread.sleep(1000); // Wait for 1 second before retrying
+            } catch (InterruptedException e) {
+                //should also check if got a termination msg
+                Thread.currentThread().interrupt(); // Restore interrupted status
+                throw new RuntimeException("Thread was interrupted while waiting", e);
             }
-
-            // Sends a message to an SQS queue, stating the location of the file on S3
-            sendSQSMessage(uploadedFilePath);
-
-            // Checks an SQS queue for a message indicating the process is done and the response
-            // (the summary file) is available on S3
-            // int summaryFileNum = checkSQSQueue(); // Get the num of summary files-------------------
-            int summaryFileNum = -1;
-
-            // Loop until a valid number is retrieved
-            while (summaryFileNum <= 0) {
-                summaryFileNum = checkSQSQueue();
-                if (summaryFileNum <= 0) {
-                    System.out.println("No valid number found in the queue. Retrying...");
-                    try {
-                        Thread.sleep(1000); // Wait for 1 second before retrying
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt(); // Restore interrupted status
-                        throw new RuntimeException("Thread was interrupted while waiting", e);
-                    }
-                }
+            summaryFileName = awsTool.checkSQSQueue(queueName, filePath);
+            //handle termination1!!
+            /*
+            if(args.length > 3 && args[3].equals("terminate")){
+                terminateManager();
+                summaryFileName = "-";
             }
-
-            // Pass the S3 bucket name to the HTMLConverter
-            HTMLConverter htmlConverter = new HTMLConverter(summaryFileNum, s3Client, BUCKET_NAME);
-            htmlConverter.generateHtmlFromMultipleTxtFiles(BUCKET_NAME, outputFileName);
-    
-        } catch (IOException e) {
-            System.err.println("Error processing file: " + e.getMessage());
+            */
         }
+        return summaryFileName;
     }
     
-
-    public static void terminateManager() {
-        // Sends a termination message to the Manager via SQS.
-        String terminationMessage = "Termination request received. Please stop the manager.";
-        sendSQSMessage(terminationMessage);
-        System.out.println("Termination message sent to the Manager.");
+    //TODO:: implement this function: terminateManager
+    public static void terminateManager() {   
     }
+    //TODO:: implement this function: initalizeManager;
+    //TODO:: implement this function: setupAWS
 
     // Main method
     public static void main(String[] args) {
-        String BUCKET_NAME = "Text_File_Bucket";
-        String SQS_QUEUE_NAME = "Client2Manager";
-        AWS awsTool = AWS.getInstance();
         if (args.length < 3) {
             System.out.println("No args: LocalApplication <inputFileName> <outputFileName> <n> [--terminate]");
             return;
@@ -84,15 +54,25 @@ public class LocalApplication{
         int n = Integer.parseInt(args[2]);
         boolean terminate = args.length > 3 && args[3].equals("terminate");
 
+        setupAWS();
+        String filePathS3 = aws.uploadFileToS3(inputFileName, BUCKET_NAME);
+        if( filePathS3 != null){
+            //shut down and update user. 
+        }
+        //message format - <file_location_s3>:::<lines_per_worker>
+        String msg = filePathS3 + dilimeter + n;
+        AWS.sendSQSMessage(msg, SQS_CLIENT);
         initalizeManager();
-        AWS.uploadFileToS3(inputFileName, BUCKET_NAME);
-        Aws
+        filePathS3 = listen(filePathS3, aws, SQS_READY);
+
+        if(aws.downloadFileFromS3(BUCKET_NAME, filePathS3, outputFileName + ".txt")){
+            processFile(outputFileName + ".txt", outputFileName + ".html");
+        }
+
 
         // If terminate flag is passed, simulate manager termination
         if (terminate) {
             terminateManager();
         }
-
-        processFile(inputFileName, outputFileName, n);
     }
 }
