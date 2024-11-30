@@ -7,23 +7,16 @@ import java.io.FileWriter;
 import java.io.IOException;
 
 public class Worker implements Runnable {
-    private final String managerSQS = "";
-    private String clientSQS;
-    private String inputFilePath; // Path to the input file
-    private int n;                      // Number of lines to process
-    private int startPosition;    // Starting line position
+    private final String managerSQS;
+    private String operation;
+    private String pdfFilePath; // Path to the input file                     // Number of lines to process
     private String outputFilePath;
     private Boolean terminate;
 
     // Constructor
-    public Worker(String sqsURL, String inputFilePath, int numLines, int startPosition,String outputFilePath ) {
-        this.inputFilePath = inputFilePath;
-        this.n = numLines;
-        this.startPosition = startPosition;
-        this.clientSQS = sqsURL;
-        this.outputFilePath = outputFilePath;
+    public Worker(String sqsURL) {
+        this.managerSQS =sqsURL;
         this.terminate = false;
-
     }
 
     @Override
@@ -36,7 +29,6 @@ public class Worker implements Runnable {
                     uploadFile();
                     update();
                     removeTask();
-                    terminate();
                 }
                 catch{
                     //update the manager according to exeception tell him the task is not completed
@@ -48,7 +40,15 @@ public class Worker implements Runnable {
     }
     
     private Boolean getMessage(){
-        return true;
+        if(){
+            return true;
+        }
+        //get a massege from sqs server could be to operate or to terminate
+        //if operate
+        //update operation, pdfFilePath and return true
+        //if it's a termination message,
+        this.terminate = true;
+        return false;
     }
 
     private void downloadFile(){
@@ -57,6 +57,7 @@ public class Worker implements Runnable {
             // TODO: handle exception
         }
     }
+
     private void processFile(){
         try (BufferedReader reader = new BufferedReader(new FileReader(inputFilePath))) {
             reader.lines().skip(startPosition).findFirst(); //maybe need to change this skipping action
@@ -103,7 +104,7 @@ public class Worker implements Runnable {
         }
         
     }
-    
+
     private void update(){}
 
     private void removeTask(){
