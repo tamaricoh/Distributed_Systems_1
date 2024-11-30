@@ -1,173 +1,109 @@
 package com.example;
 
-import software.amazon.awssdk.services.s3.model.*;
-import software.amazon.awssdk.services.s3.S3Client;
 import java.io.*;
-import java.util.List;
-
+import java.net.URL;
 
 public class HTMLConverter {
 
-    private int numOfResponses; 
-    private S3Client s3Client;
-    private String s3BucketName;
+    private String inputFilePath;
+    private String outputFilePath;
 
-    // Constructor to initialize numOfResponses and S3Client
-    public HTMLConverter(int numOfResponses, S3Client s3Client, String s3BucketName) {
-        this.numOfResponses = numOfResponses;
-        this.s3Client = s3Client;
-        this.s3BucketName = s3BucketName;
+    // Constructor to initialize the input and output file paths
+    public HTMLConverter(String inputFilePath, String outputFilePath) {
+        this.inputFilePath = inputFilePath;
+        this.outputFilePath = outputFilePath;
     }
 
+    /*Builds the HTML header for the output file
+    */
     private static String buildHtmlHeader() {
         return "<html>\n<head><title>PDF Processing Results</title></head>\n<body>\n" +
                "<h1>PDF Processing Results</h1>\n<ul>\n";
     }
 
-    // Function to add a response file to the HTML
-    private static String addResponseToHtml(String line) {
-        StringBuilder responseHtml = new StringBuilder();
-
-        String[] parts = line.split(",\\s*"); // Split by comma and optional spaces
-        if (parts.length < 3) {
-            System.err.println("Invalid format: " + line);
-            return ""; // Skip invalid lines
-        }
-
-        String operation = parts[0];
-        String inputFile = parts[1];
-        String outputFile = parts[2];
-
-        responseHtml.append("<li>\n");
-        responseHtml.append("<strong>").append(operation).append("</strong>: ");
-        responseHtml.append("<a href=\"").append(inputFile).append("\" target=\"_blank\">")
-                    .append("Input File")
-                    .append("</a> ");
-
-        if (outputFile.startsWith("http://") || outputFile.startsWith("https://")) {
-            responseHtml.append("-> <a href=\"").append(outputFile).append("\" target=\"_blank\">")
-                        .append("Output File")
-                        .append("</a>");
-        } else {
-            responseHtml.append("-> ").append(outputFile);
-        }
-
-        responseHtml.append("</li>\n");
-
-        return responseHtml.toString();
-    }
-
-    // Method to convert text from S3 to HTML
-    private void TxtToHtml(InputStream s3InputStream, StringBuilder htmlContent) throws IOException {
-        // Read the content of the S3 file into a string
-        BufferedReader reader = new BufferedReader(new InputStreamReader(s3InputStream));
-        String line;
-
-        // Convert each line to HTML and append it
-        while ((line = reader.readLine()) != null) {
-            htmlContent.append(addResponseToHtml(line));
-        }
-
-        reader.close();
-    }
-
+    /*Builds the HTML footer for the output file*/
     private static String buildHtmlFooter() {
         return "</ul>\n</body>\n</html>";
     }
 
-    // Main function to generate HTML from multiple S3 text files
-    public void generateHtmlFromMultipleTxtFiles(String prefix, String htmlFilePath) throws IOException {
-        StringBuilder htmlContent = new StringBuilder();
+    /** Converts a line (operation, input URL, and output URL or error) into an HTML list item
+    * If the new URL is valid, it creates a clickable link, otherwise it write the error message
+    * @param line - a string array of format [operation, url, newUrl]
+    */
+    private static String addResponseToHtml(String[] line) {
+        StringBuilder responseHtml = new StringBuilder();
+        responseHtml.append("<li>\n");
+        responseHtml.append("<strong>").append(line[0]).append("</strong>: ");
+        responseHtml.append("<a href=\"").append(line[1]).append("\" target=\"_blank\">")
+                    .append("Original PDF")
+                    .append("</a> ");
 
-        // Build HTML header
-        htmlContent.append(buildHtmlHeader());
-
-        // List the objects in the S3 bucket (limit the number of files processed)
-        ListObjectsRequest listObjectsRequest = ListObjectsRequest.builder()
-                .bucket(s3BucketName)
-                .prefix(prefix) // Optional prefix filtering (e.g., if the files are stored under a specific folder)
-                .build();
-
-        ListObjectsResponse listObjectsResponse = s3Client.listObjects(listObjectsRequest);
-        List<S3Object> objects = listObjectsResponse.contents();
-
-        // Process each file from S3
-        int processedFiles = 0;
-        for (S3Object object : objects) {
-            if (object.key().endsWith(".txt") && processedFiles < numOfResponses) {
-                // Get the S3 object content
-                GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                        .bucket(s3BucketName)
-                        .key(object.key()) // Use the object's key (file name) directly
-                        .build();
-
-                // Fetch the object content as an InputStream
-                InputStream s3InputStream = s3Client.getObject(getObjectRequest);
-                TxtToHtml(s3InputStream, htmlContent);  // Convert the content to HTML
-                processedFiles++;
-            }
+        // Check if the new URL is valid or add an error message
+        if (isValidUrl(line[2])) {
+            responseHtml.append("-> <a href=\"").append(line[2]).append("\" target=\"_blank\">")
+                        .append("Processed PDF")
+                        .append("</a>");
+        } else {
+            responseHtml.append("Error: ").append(line[2]);
         }
-
-        // Append HTML footer
-        htmlContent.append(buildHtmlFooter());
-
-        // Write the HTML content to the output file
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(htmlFilePath))) {
-            writer.write(htmlContent.toString());
-        }
-
-        System.out.println("HTML file created: " + htmlFilePath);
+        responseHtml.append("</li>\n");
+        return responseHtml.toString();
     }
 
-// public static void generateHtmlFromTxt(String txtFilePath, String htmlFilePath) throws IOException {
-//         File txtFile = new File(txtFilePath);
-//         BufferedReader reader = new BufferedReader(new FileReader(txtFile));
-        
-//         StringBuilder htmlContent = new StringBuilder();
-//         htmlContent.append("<html>\n<head><title>PDF Processing Results</title></head>\n<body>\n");
-//         htmlContent.append("<h1>PDF Processing Results</h1>\n<ul>\n");
+    /* Helper method to check if a URL is valid
+    * It attempts to create a URL object and URI to check for syntax correctness
+    */
+    private static boolean isValidUrl(String url) {
+        try {
+            new URL(url).toURI();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
+    // Converts the content of the input text file to an HTML file
+    // Reads each line from the input file, converts it to an HTML list item, 
+    // and writes it to the output HTML file. If an error occurs during the process, 
+    // the HTML file is deleted and the method returns false.
+    public boolean convertToHTML() {
+        BufferedReader reader = null;
+        BufferedWriter writer = null;
+        File outputFile = new File(outputFilePath);
 
-//         String line;
-//         while ((line = reader.readLine()) != null) {
-//             String[] parts = line.split(",\\s*"); // Split by comma and optional spaces
-//             if (parts.length < 3) {
-//                 System.err.println("Invalid format: " + line);
-//                 continue;
-//             }
+        try {
+            writer = new BufferedWriter(new FileWriter(outputFile));
+            writer.write(buildHtmlHeader());
+            File inputFile = new File(inputFilePath);
+            reader = new BufferedReader(new FileReader(inputFile));
+            String line;
+            // Iterate over each line of the input file
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",\\s*");
+                writer.write(addResponseToHtml(parts));
+            }
+            writer.write(buildHtmlFooter());
+            return true;
 
-//             String operation = parts[0];
-//             String inputFile = parts[1];  
-//             String outputFile = parts[2]; 
-            
-//             htmlContent.append("<li>\n");
-//             htmlContent.append("<strong>").append(operation).append("</strong>: ");
+        } catch (IOException e) {
+            // Handle errors: delete the .html file if something goes wrong
+            System.err.println("Error occurred: " + e.getMessage());
+            if (outputFile.exists()) {
+                outputFile.delete();
+            }
+            return false;
 
-//             htmlContent.append("<a href=\"").append(inputFile).append("\" target=\"_blank\">")
-//                        .append("Input File")
-//                        .append("</a> ");
-
-//             if (outputFile.startsWith("http://") || outputFile.startsWith("https://")) {
-//                 htmlContent.append("-> <a href=\"").append(outputFile).append("\" target=\"_blank\">")
-//                            .append("Output File")
-//                            .append("</a>");
-//             } else {
-//                 htmlContent.append("-> ").append(outputFile);
-//             }
-
-//             htmlContent.append("</li>\n");
-//         }
-
-//         reader.close();
-
-//         // Complete the HTML content
-//         htmlContent.append("</ul>\n</body>\n</html>");
-
-//         // Write the HTML content to the output file
-//         BufferedWriter writer = new BufferedWriter(new FileWriter(htmlFilePath));
-//         writer.write(htmlContent.toString());
-//         writer.close();
-
-//         System.out.println("HTML file created: " + htmlFilePath);
-//     }
+        } finally { // Close the reader and writer
+            try {
+                if (reader != null) {
+                    reader.close();
+                }
+                if (writer != null) {
+                    writer.close();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 }
