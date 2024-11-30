@@ -48,34 +48,36 @@ public class PDFConverter {
         }
     }
 
-    public static String convertFromUrl(String urlString, String operation) throws IOException {
-        URL url = new URL(urlString);
-        File tempPdf = File.createTempFile("downloaded", ".pdf");
-        tempPdf.deleteOnExit();
+    public static String convertFromUrl(String PDFfile, String operation) throws IOException {
+        // URL url = new URL(urlString);
+        // File tempPdf = File.createTempFile("downloaded", ".pdf");
+        // tempPdf.deleteOnExit();
     
-        try {
-            // Download PDF
-            try (java.io.InputStream in = url.openStream()) {
-                java.nio.file.Files.copy(in, tempPdf.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            }
+        // try {
+        //     // Download PDF
+        //     try (java.io.InputStream in = url.openStream()) {
+        //         java.nio.file.Files.copy(in, tempPdf.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        //     }
     
-            String baseFileName = tempPdf.getAbsolutePath().replace(".pdf", "");
-            String outputPath;
+        //     String baseFileName = tempPdf.getAbsolutePath().replace(".pdf", "");
+        //     String outputPath;
     
             // Handle different operations
+            String baseFileName = PDFfile.replace(".pdf", "");
+            String outputPath;
             switch (operation.toUpperCase()) {
                 case "TOIMAGE":
                     outputPath = baseFileName + ".png";
-                    convertToImage(tempPdf.getAbsolutePath(), outputPath);
+                    convertToImage(PDFfile, outputPath);
                     break;
                 case "TOTEXT":
                     outputPath = baseFileName + ".txt";
-                    convertToText(tempPdf.getAbsolutePath(), outputPath);
+                    convertToText(PDFfile, outputPath);
                     break;
                 case "TOHTML":
                     outputPath = baseFileName + ".html";
-                    try {
-                        convertToHTML(tempPdf.getAbsolutePath(), outputPath);
+                    try { // --------------------------------------------
+                        convertToHTML(PDFfile, outputPath);
                     } catch (IOException e) {
                         // Return an error message when HTML conversion fails
                         return "Error: Unable to convert PDF to HTML. Reason: " + e.getMessage();
@@ -88,9 +90,9 @@ public class PDFConverter {
             // Return the URL of the output file
             return new File(outputPath).toURI().toString();
     
-        } catch (IOException e) {
-            // Catch any IOException, including file download or conversion issues
-            return "Error: Unable to download or process PDF. Reason: " + e.getMessage();
-        }
+        // } catch (IOException e) {
+        //     // Catch any IOException, including file download or conversion issues
+        //     return "Error: Unable to download or process PDF. Reason: " + e.getMessage();
+        // }
     }
 }

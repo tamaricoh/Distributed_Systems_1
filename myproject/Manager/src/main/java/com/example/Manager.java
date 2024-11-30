@@ -31,10 +31,10 @@ import software.amazon.awssdk.services.ec2.model.Tag;
 public class Manager implements Runnable {
     private static final String LOCALAPP_TO_MANAGER_QUEUE_NAME = "LocalApp-To-Manager";
     private static final String MANAGER_TO_LOCALAPP_QUEUE_NAME = "Manager_To_LocalApp";
-    private static final String MANAGER_TO_WORKER_QUEUE_NAME = "Manager-To-Workers";
-    private static final String WORKER_TO_MANAGER_QUEUE_NAME = "Workers-To-Manager";
+    private static final String MANAGER_TO_WORKERS_QUEUE_NAME = "Manager-To-Workers";
+    private static final String WORKERS_TO_MANAGER_QUEUE_NAME = "Workers-To-Manager";
     private static final String LOCALAPP_TO_MANAGER_BUCKET_NAME = "LocalApp-To-Manager";
-    // private static final String WORKER_TO_MANAGER_BUCKET_NAME = "Workers-To-Manager";
+    private static final String WORKERS_TO_MANAGER_BUCKET_NAME = "Workers-To-Manager";
     public static Region region1 = Region.US_WEST_2;
     public static Region region2 = Region.US_EAST_1;
     private static final InstanceType workerType = InstanceType.T2_LARGE;
@@ -75,10 +75,11 @@ public class Manager implements Runnable {
     public void run() {
         String LocalAppID = "";
         int numOfTasks = 0;
-        // Step 1: Receive message from the LOCALAPP_TO_MANAGER queue
+
+        // Step 1: Receive a single message from the LOCALAPP_TO_MANAGER queue
         ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder()
                 .queueUrl(getQueueUrl(LOCALAPP_TO_MANAGER_QUEUE_NAME))
-                .maxNumberOfMessages(1)
+                .maxNumberOfMessages(1) // We only expect one message at a time
                 .waitTimeSeconds(20) // Long polling to wait for a message
                 .build();
 
@@ -90,42 +91,42 @@ public class Manager implements Runnable {
             return;
         }
 
-        // Step 2: Process the received message
-        for (Message message : messages) {
-            String messageBody = message.body(); // The entire message body
+        // Step 2: Process the received message (assuming only one message)
+        Message message = messages.get(0);  // Get the first (and only) message
+        String messageBody = message.body(); // The entire message body
 
-            // Parse the message body into components
-            if (messageBody != null && !messageBody.isEmpty()) {
-                String[] parts = messageBody.split(" "); // Assuming space-separated values
-                if (parts.length == 3) {
-                    String s3Location = parts[0];  // Extract S3 location
-                    String linesPerWorkerStr = parts[1]; // Extract LinesPerWorker
-                    
-                    // Convert LinesPerWorker to an integer
-                    int linesPerWorker = Integer.parseInt(linesPerWorkerStr);
-                    // Step 3: Download the file from S3
-                    if (s3Location != null && !s3Location.isEmpty()) {
-                        // Call the downloadFileFromS3 method and capture the returned Path
-                        Path downloadedFilePath = downloadFileFromS3(s3Location);
-                        // 
-                        // Check if the file was downloaded successfully
-                        if (downloadedFilePath != null) {
-                            System.out.println("File downloaded successfully to: " + downloadedFilePath);
-                            LocalAppID = downloadedFilePath.toString();
-                            // Process the file and create SQS messages for workers
-                            numOfTasks = processFileAndCreateSQSMessages(downloadedFilePath, linesPerWorker, LocalAppID);
-                        } else {
-                            System.err.println("Failed to download file from S3 for location: " + s3Location);
-                        }
+        // Parse the message body into components
+        if (messageBody != null && !messageBody.isEmpty()) {
+            String[] parts = messageBody.split(" "); // Assuming space-separated values
+            if (parts.length == 3) {
+                String s3Location = parts[0];  // Extract S3 location
+                String linesPerWorkerStr = parts[1]; // Extract LinesPerWorker
+                // Convert LinesPerWorker to an integer
+                int linesPerWorker = Integer.parseInt(linesPerWorkerStr);
+
+                // Step 3: Download the file from S3
+                if (s3Location != null && !s3Location.isEmpty()) {
+                    // Call the downloadFileFromS3 method and capture the returned Path
+                    Path downloadedFilePath = downloadFileFromS3(s3Location);
+
+                    // Check if the file was downloaded successfully
+                    if (downloadedFilePath != null) {
+                        System.out.println("File downloaded successfully to: " + downloadedFilePath);
+                        LocalAppID = downloadedFilePath.toString();
+                        
+                        // Process the file and create SQS messages for workers
+                        numOfTasks = processFileAndCreateSQSMessages(downloadedFilePath, linesPerWorker, LocalAppID);
+                    } else {
+                        System.err.println("Failed to download file from S3 for location: " + s3Location);
                     }
-                } else {
-                    System.err.println("Malformed message: " + messageBody);
                 }
+            } else {
+                System.err.println("Malformed message: " + messageBody);
             }
-
-            // Delete the message from the LOCALAPP_TO_MANAGER queue after processing
-            deleteMessage(message, LOCALAPP_TO_MANAGER_QUEUE_NAME);
         }
+
+        // Step 4: Delete the message from the LOCALAPP_TO_MANAGER queue after processing
+        deleteMessage(message, LOCALAPP_TO_MANAGER_QUEUE_NAME);
 
         if (LocalAppID != ""){
             String summaryFileName = "Summary" + LocalAppID + ".txt";
@@ -141,52 +142,74 @@ public class Manager implements Runnable {
                 return;
             }
 
-            int taskDone = 0;
-            // Loop until all tasks are done
-            while (taskDone < numOfTasks) {
-                // Receive a message from the WORKER_TO_MANAGER_QUEUE_NAME
-                ReceiveMessageRequest receiveRequest = ReceiveMessageRequest.builder()
-                        .queueUrl(getQueueUrl(WORKER_TO_MANAGER_QUEUE_NAME))
-                        .maxNumberOfMessages(1) // Read one message at a time
-                        .waitTimeSeconds(10) // Long-polling for efficiency
+            while (true) {
+                // List objects in the S3 bucket to check if the number of objects matches numOfTasks
+                ListObjectsV2Request listObjectsRequest = ListObjectsV2Request.builder()
+                        .bucket(WORKERS_TO_MANAGER_BUCKET_NAME + "/" + LocalAppID)
                         .build();
-
-                List<Message> messagesFromWorkers = sqsClient.receiveMessage(receiveRequest).messages();
-
-                if (!messagesFromWorkers.isEmpty()) {
-                    // Process the message
-                    Message message = messagesFromWorkers.get(0);
-                    String messageBody = message.body(); // Assuming body format: <operation> <oldurl> <newurl>
-                    System.out.println("Received message: " + messageBody);
-
-                    // Append the message body to the summary file
-                    try (BufferedWriter writer = Files.newBufferedWriter(summaryFilePath, StandardOpenOption.APPEND)) {
-                        writer.write(messageBody);
-                        writer.newLine(); // Add a newline after each entry
-                        System.out.println("Appended to summary file: " + messageBody);
-                    } catch (IOException e) {
-                        System.err.println("Error writing to summary file: " + e.getMessage());
-                    }
-
-                    // Delete the message from the queue
-                    DeleteMessageRequest deleteRequest = DeleteMessageRequest.builder()
-                            .queueUrl(getQueueUrl(WORKER_TO_MANAGER_QUEUE_NAME))
-                            .receiptHandle(message.receiptHandle())
-                            .build();
-
-                    sqsClient.deleteMessage(deleteRequest);
-                    System.out.println("Deleted message from queue.");
-
-                    // Increment the task done counter
-                    taskDone++;
+            
+                ListObjectsV2Response listObjectsResponse = s3Client.listObjectsV2(listObjectsRequest);
+            
+                // Get the number of objects in the S3 bucket
+                int currentObjectCount = listObjectsResponse.contents().size();
+                
+                // Check if the number of objects matches numOfTasks
+                if (currentObjectCount >= numOfTasks) {
+                    // Once the condition is met, process the messages
+                    break; // Exit the loop once the number of objects in S3 matches numOfTasks
                 } else {
-                    System.out.println("No messages received. Waiting...");
+                    // If the number of objects is less than numOfTasks, wait and check again
+                    System.out.println("Waiting for " + (numOfTasks - currentObjectCount) + " more objects to arrive in the S3 bucket...");
+                    
+                    try {
+                        Thread.sleep(10000); // Wait for 10 seconds before checking again
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        System.err.println("Thread was interrupted: " + e.getMessage());
+                    }
                 }
             }
 
+            for (int i = 0; i < numOfTasks; i++) {
+                // 1. Receive a message from the WORKERS_TO_MANAGER queue for each task
+                ReceiveMessageRequest workerMessageRequest = ReceiveMessageRequest.builder()
+                        .queueUrl(getQueueUrl(WORKERS_TO_MANAGER_QUEUE_NAME))
+                        .maxNumberOfMessages(1)  // We expect only one message per task
+                        .waitTimeSeconds(20)  // Long polling to wait for messages from workers
+                        .build();
+            
+                ReceiveMessageResponse workerMessageResponse = sqsClient.receiveMessage(workerMessageRequest);
+                List<Message> workerMessages = workerMessageResponse.messages();
+            
+                if (!workerMessages.isEmpty()) {
+                    // Process the worker message (assuming it contains the result URL or relevant data)
+                    Message workerMessage = workerMessages.get(0);
+                    String workerMessageBody = workerMessage.body();
+                    
+                    // Here, you might want to parse the worker's message or perform further processing
+                    // Example: Assuming the worker's message contains a result URL
+                    if (workerMessageBody != null && !workerMessageBody.isEmpty()) {
+                        System.out.println("Received worker message: " + workerMessageBody);
+                        // Optionally, process the worker's data (e.g., download the result from S3)
+                        
+                        // Add the worker's result to the summary file
+                        try {
+                            Files.write(summaryFilePath, (workerMessageBody + "\n").getBytes(), StandardOpenOption.APPEND);
+                        } catch (IOException e) {
+                            System.err.println("Error writing to summary file: " + e.getMessage());
+                        }
+                    }
+            
+                    // Step 2: After processing, delete the worker message from the queue
+                    deleteMessage(workerMessage, WORKERS_TO_MANAGER_QUEUE_NAME);
+                } else {
+                    System.out.println("No messages available in the WORKERS_TO_MANAGER queue for task " + (i + 1));
+                }
+            }
+            
             System.out.println("All tasks completed. Summary file updated: " + summaryFileName);
             uploadToS3(summaryFilePath);
-            postSQSMessage(summaryFileName);
+            sendSQSMessage(summaryFileName);
         }
     }
 
@@ -258,7 +281,7 @@ public class Manager implements Runnable {
                     String url = parts[1]; // URL
                     numOfTasks++;
                     // Create and send the SQS message
-                    msg = createSQSMessage(operation, url, LocalAppID);
+                    msg = createSQSMessage(operation, url);
                     sendSQSMessageToWorker(msg, LocalAppID);
                     count++;
                     if (count == linesPerWorker){
@@ -275,13 +298,15 @@ public class Manager implements Runnable {
         return numOfTasks;
     }
     
-    private String createSQSMessage(String operation, String url, String LocalAppID) {
-        return "Operation: " + operation + " URL: " + url + " LocalAppID: " + LocalAppID;
+    private String createSQSMessage(String operation, String url) {
+        return "Operation: " + operation + " URL: " + url;
     }
 
     private void createWorkerInstances(int linesPerWorker, String LocalAppID) {
         System.out.println("Creating a worker instance.");
-        String modifiedScript = workerScript + "\n" + "LINES_PER_WORKER=" + linesPerWorker + "\n" + "LOCAL_APP_ID="+ LocalAppID;
+        String modifiedScript = workerScript + "\n" 
+            + "export LINES_PER_WORKER=" + linesPerWorker + "\n"
+            + "export LOCAL_APP_ID=" + LocalAppID;
         // Create a single worker EC2 instance
         createEC2(modifiedScript, WORKER_TAG, workerType);
     }
@@ -329,14 +354,10 @@ public class Manager implements Runnable {
         }
     }
 
-    private void sendSQSMessageToWorker(String msg, String LocalAppID) {
-        // Create the SQS message to send to the worker instance
-        String message = "New task for worker: " + msg;
-    
-        // Assuming the queue URL is already set (replace with actual queue URL)
+    private void sendSQSMessageToWorker(String msg, String LocalAppID) {    
         SendMessageRequest sendMessageRequest = SendMessageRequest.builder()
-                .queueUrl(getQueueUrl(MANAGER_TO_WORKER_QUEUE_NAME + " " + LocalAppID)) 
-                .messageBody(message)     // Message body with worker instance ID and task
+                .queueUrl(getQueueUrl(MANAGER_TO_WORKERS_QUEUE_NAME + "/" + LocalAppID)) 
+                .messageBody(msg)     // Message body with worker instance ID and task
                 .build();
 
         // Send the message to SQS
@@ -361,7 +382,7 @@ public class Manager implements Runnable {
         }
     }
 
-    private void postSQSMessage(String summaryS3Url) {
+    private void sendSQSMessage(String summaryS3Url) {
         String messageBody = "Summary file uploaded to S3 at: " + summaryS3Url;
 
         SendMessageRequest sendMessageRequest = SendMessageRequest.builder()
