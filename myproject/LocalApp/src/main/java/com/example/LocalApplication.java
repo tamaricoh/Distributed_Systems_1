@@ -14,119 +14,7 @@ import java.nio.file.Paths;
 // import java.nio.file.StandardCopyOption;
 import java.nio.file.Path;
 
-public class LocalApplication {
-
-    // Replace your-bucket-name, your-access-key, and your-secret-key with your actual S3 bucket name and credentials.
-    private static final String BUCKET_NAME = "your-bucket-name";  // Replace with your S3 bucket name
-    private static final String REGION = "us-east-1";  // Replace with the desired AWS region
-    private static final String ACCESS_KEY = "your-access-key";  // Replace with your AWS Access Key
-    private static final String SECRET_KEY = "your-secret-key";  // Replace with your AWS Secret Key
-    private static final String SQS_QUEUE_NAME = "your-queue-name";  // Replace with your SQS queue name
-
-     // Create a single SQS client instance to be used across methods
-     private static final SqsClient sqsClient = SqsClient.builder()
-        // Manager will delete this message from the sqs
-        .region(Region.of(REGION))
-        .credentialsProvider(StaticCredentialsProvider.create(
-             AwsBasicCredentials.create(ACCESS_KEY, SECRET_KEY)))
-        .build();
-
-    private static final S3Client s3Client = S3Client.builder()
-        .region(Region.of(REGION))
-        .credentialsProvider(StaticCredentialsProvider.create(
-            AwsBasicCredentials.create(ACCESS_KEY, SECRET_KEY)))
-        .build();
-
-    // Sends a message to an SQS queue, stating the location of the file on S3
-    public static void sendSQSMessage(String message) {
-        try {
-            // Get the queue URL
-            GetQueueUrlRequest getQueueUrlRequest = GetQueueUrlRequest.builder()
-                    .queueName(SQS_QUEUE_NAME)
-                    .build();
-
-            GetQueueUrlResponse queueUrlResponse = sqsClient.getQueueUrl(getQueueUrlRequest);
-            String queueUrl = queueUrlResponse.queueUrl();
-
-            // Send the message with the file location
-            SendMessageRequest sendMessageRequest = SendMessageRequest.builder()
-                    .queueUrl(queueUrl)
-                    .messageBody(message)
-                    .build();
-
-            sqsClient.sendMessage(sendMessageRequest);
-            // Location of file or terminate
-            System.out.println("SQS Message Sent:" + message);
-
-        } catch (SqsException e) {
-            System.err.println("Error sending SQS message: " + e.awsErrorDetails().errorMessage());
-        }
-    }
-
-    // Checks an SQS queue for a message indicating the process is done and the response (the summary file) is available on S3.
-    // Extracts the number of summary files from the message body.
-    public static int checkSQSQueue() {
-        try {
-            // Get the queue URL
-            GetQueueUrlRequest getQueueUrlRequest = GetQueueUrlRequest.builder()
-                    .queueName(SQS_QUEUE_NAME)
-                    .build();
-
-            GetQueueUrlResponse queueUrlResponse = sqsClient.getQueueUrl(getQueueUrlRequest);
-            String queueUrl = queueUrlResponse.queueUrl();
-
-            // Receive messages from the queue
-            ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder()
-                    .queueUrl(queueUrl)
-                    .maxNumberOfMessages(1)  // Only retrieve one message at a time
-                    .build();
-
-            ReceiveMessageResponse receiveMessageResponse = sqsClient.receiveMessage(receiveMessageRequest);
-
-            if (!receiveMessageResponse.messages().isEmpty()) {
-                // Get the message body
-                String messageBody = receiveMessageResponse.messages().get(0).body();
-                System.out.println("Message received: " + messageBody);
-
-                // Assuming the message contains the number of summary files in the format:
-                // "Process is complete. There are NUM summary files ready for you."
-                String[] parts = messageBody.split(" ");
-                if (parts.length > 5) {
-                    try {
-                        return Integer.parseInt(parts[5]); // Extract the NUM part of the message
-                    } catch (NumberFormatException e) {
-                        System.err.println("Error extracting number from message.");
-                    }
-                }
-            }
-
-        } catch (SqsException e) {
-            System.err.println("Error checking SQS queue: " + e.awsErrorDetails().errorMessage());
-        }
-        return -1;  // Return -1 if no valid message is found
-    }
-
-    // Uploads the file to S3 - returns the file path if the upload succeeds or null if it fails.
-    public static String uploadFileToS3(String inputFileName) throws IOException {
-        // Create the S3 object key (you can use any naming strategy)
-        String s3Key = Paths.get(inputFileName).getFileName().toString();
-        
-        // Upload the file
-        try {
-            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                    .bucket(BUCKET_NAME)
-                    .key(s3Key)
-                    .build();
-
-            Path path = Paths.get(inputFileName);
-            s3Client.putObject(putObjectRequest, path);
-            System.out.println("File uploaded successfully to S3: " + s3Key);
-            return s3Key;
-        } catch (S3Exception e) {
-            System.err.println("Error uploading file to S3: " + e.awsErrorDetails().errorMessage());
-            return null;
-        }
-    }
+public class LocalApplication{
 
     // Method to process the file
     public static void processFile(String inputFileName, String outputFileName, int n) {
@@ -183,7 +71,9 @@ public class LocalApplication {
 
     // Main method
     public static void main(String[] args) {
-
+        String BUCKET_NAME = "Text_File_Bucket";
+        String SQS_QUEUE_NAME = "Client2Manager";
+        AWS awsTool = AWS.getInstance();
         if (args.length < 3) {
             System.out.println("No args: LocalApplication <inputFileName> <outputFileName> <n> [--terminate]");
             return;
@@ -192,7 +82,11 @@ public class LocalApplication {
         String inputFileName = args[0];
         String outputFileName = args[1];
         int n = Integer.parseInt(args[2]);
-        boolean terminate = args.length > 3 && args[3].equals("--terminate");
+        boolean terminate = args.length > 3 && args[3].equals("terminate");
+
+        initalizeManager();
+        AWS.uploadFileToS3(inputFileName, BUCKET_NAME);
+        Aws
 
         // If terminate flag is passed, simulate manager termination
         if (terminate) {
