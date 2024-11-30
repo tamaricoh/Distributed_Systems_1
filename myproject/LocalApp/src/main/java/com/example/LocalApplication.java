@@ -1,6 +1,6 @@
 package com.example;
 import java.io.*;
-import java.util.Scanner;
+// import java.util.Scanner;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,9 +16,11 @@ public class LocalApplication {
         System.out.println("Manager message: " + message);
     }
 
-    public static String checkSQSQueue() {
-        //Checks an SQS queue for a message indicating the process is done and the response (the summary file) is available on S3.
-        return "Processing complete. Summary file available.";
+    public static int checkSQSQueue() {
+        // Checks an SQS queue for a message indicating the process is done and the response (the summary file) is available on S3.
+        // In the manager's message, we will receive the number of responses in S3 that contain our outputs, and from them, we will assemble the HTML.
+        return 5;
+        
     }
 
     // Uploads the file to S3
@@ -48,10 +50,9 @@ public class LocalApplication {
 
             // Checks an SQS queue for a message indicating the process is done and the response
             // (the summary file) is available on S3
-            String summaryFileName = checkSQSQueue(); // Get the summary file name
-            System.out.println("Manager Response: " + summaryFileName);
-
-            HTMLConverter.generateHtmlFromTxt(summaryFileName, outputFileName);
+            int summaryFileNum = checkSQSQueue(); // Get the num of summary files
+            HTMLConverter htmlConverter = new HTMLConverter(summaryFileNum);
+            htmlConverter.generateHtmlFromMultipleTxtFiles("", outputFileName);
     
         } catch (IOException e) {
             System.err.println("Error processing file: " + e.getMessage());
