@@ -1,15 +1,22 @@
 package com.example;
 
+import software.amazon.awssdk.services.s3.model.*;
+import software.amazon.awssdk.services.s3.S3Client;
 import java.io.*;
+import java.util.List;
+
 
 public class HTMLConverter {
 
     private int numOfResponses; 
+    private S3Client s3Client;
+    private String s3BucketName;
 
-    // Constructor to initialize numOfResponses
-    public HTMLConverter(int numOfResponses) {
+    // Constructor to initialize numOfResponses and S3Client
+    public HTMLConverter(int numOfResponses, S3Client s3Client, String s3BucketName) {
         this.numOfResponses = numOfResponses;
-        
+        this.s3Client = s3Client;
+        this.s3BucketName = s3BucketName;
     }
 
     private static String buildHtmlHeader() {
@@ -50,47 +57,65 @@ public class HTMLConverter {
         return responseHtml.toString();
     }
 
-    private void TxtToHtml(BufferedReader reader, StringBuilder htmlContent) throws IOException {
+    // Method to convert text from S3 to HTML
+    private void TxtToHtml(InputStream s3InputStream, StringBuilder htmlContent) throws IOException {
+        // Read the content of the S3 file into a string
+        BufferedReader reader = new BufferedReader(new InputStreamReader(s3InputStream));
         String line;
 
+        // Convert each line to HTML and append it
         while ((line = reader.readLine()) != null) {
             htmlContent.append(addResponseToHtml(line));
         }
+
+        reader.close();
     }
 
     private static String buildHtmlFooter() {
         return "</ul>\n</body>\n</html>";
     }
 
-    // Main function to generate the HTML from a text file
-    public void generateHtmlFromMultipleTxtFiles(String baseFilePath, String htmlFilePath) throws IOException {
+    // Main function to generate HTML from multiple S3 text files
+    public void generateHtmlFromMultipleTxtFiles(String prefix, String htmlFilePath) throws IOException {
         StringBuilder htmlContent = new StringBuilder();
-    
+
+        // Build HTML header
         htmlContent.append(buildHtmlHeader());
-    
-        // Loop through `numOfResponses` and process each file
-        for (int i = 0; i < numOfResponses; i++) {
-            // here it will get the txt file from s3 or sqs in the future.
-            String txtFilePath = baseFilePath + (i + 1) + ".txt";
-            File txtFile = new File(txtFilePath);
-    
-            if (txtFile.exists()) {
-                // Add responses from the current file
-                BufferedReader reader = new BufferedReader(new FileReader(txtFile));
-                TxtToHtml(reader, htmlContent);
-                reader.close();
-            } else {
-                System.err.println("File not found: " + txtFilePath);
+
+        // List the objects in the S3 bucket (limit the number of files processed)
+        ListObjectsRequest listObjectsRequest = ListObjectsRequest.builder()
+                .bucket(s3BucketName)
+                .prefix(prefix) // Optional prefix filtering (e.g., if the files are stored under a specific folder)
+                .build();
+
+        ListObjectsResponse listObjectsResponse = s3Client.listObjects(listObjectsRequest);
+        List<S3Object> objects = listObjectsResponse.contents();
+
+        // Process each file from S3
+        int processedFiles = 0;
+        for (S3Object object : objects) {
+            if (object.key().endsWith(".txt") && processedFiles < numOfResponses) {
+                // Get the S3 object content
+                GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                        .bucket(s3BucketName)
+                        .key(object.key()) // Use the object's key (file name) directly
+                        .build();
+
+                // Fetch the object content as an InputStream
+                InputStream s3InputStream = s3Client.getObject(getObjectRequest);
+                TxtToHtml(s3InputStream, htmlContent);  // Convert the content to HTML
+                processedFiles++;
             }
         }
-    
+
+        // Append HTML footer
         htmlContent.append(buildHtmlFooter());
-    
+
         // Write the HTML content to the output file
-        BufferedWriter writer = new BufferedWriter(new FileWriter(htmlFilePath));
-        writer.write(htmlContent.toString());
-        writer.close();
-    
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(htmlFilePath))) {
+            writer.write(htmlContent.toString());
+        }
+
         System.out.println("HTML file created: " + htmlFilePath);
     }
 
