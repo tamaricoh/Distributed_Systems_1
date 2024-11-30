@@ -34,7 +34,7 @@ public class Manager implements Runnable {
     private static final String MANAGER_TO_WORKER_QUEUE_NAME = "Manager-To-Workers";
     private static final String WORKER_TO_MANAGER_QUEUE_NAME = "Workers-To-Manager";
     private static final String LOCALAPP_TO_MANAGER_BUCKET_NAME = "LocalApp-To-Manager";
-    private static final String WORKER_TO_MANAGER_BUCKET_NAME = "Workers-To-Manager";
+    // private static final String WORKER_TO_MANAGER_BUCKET_NAME = "Workers-To-Manager";
     public static Region region1 = Region.US_WEST_2;
     public static Region region2 = Region.US_EAST_1;
     private static final InstanceType workerType = InstanceType.T2_LARGE;
