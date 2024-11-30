@@ -19,8 +19,7 @@ public class LocalApplication {
     public static int checkSQSQueue() {
         // Checks an SQS queue for a message indicating the process is done and the response (the summary file) is available on S3.
         // In the manager's message, we will receive the number of responses in S3 that contain our outputs, and from them, we will assemble the HTML.
-        return 5;
-        
+        return 5;  
     }
 
     // Uploads the file to S3
@@ -35,22 +34,39 @@ public class LocalApplication {
     // Method to process the file
     public static void processFile(String inputFileName, String outputFileName, int n) {
         try {
+
+            // Checks if a Manager node is active on the EC2 cloud.
+            // If it is not, the application will start the manager node.
+            Manager manager = new Manager(inputFileName, n, 50000);
+
             // Uploads the file to S3.
             String uploadedFilePath = uploadFileToS3(inputFileName);
             if (uploadedFilePath == null) {
                 return;
             }
 
-            // Checks if a Manager node is active on the EC2 cloud.
-            // If it is not, the application will start the manager node.
-            Manager manager = new Manager(inputFileName, n, 50000);
-
             // Sends a message to an SQS queue, stating the location of the file on S3
-            sendSQSMessage("File uploaded to: " + uploadedFilePath, manager);
+            sendSQSMessage(uploadedFilePath, manager);
 
             // Checks an SQS queue for a message indicating the process is done and the response
             // (the summary file) is available on S3
-            int summaryFileNum = checkSQSQueue(); // Get the num of summary files
+            // int summaryFileNum = checkSQSQueue(); // Get the num of summary files-------------------
+            int summaryFileNum = -1;
+
+            // Loop until a valid number is retrieved
+            while (summaryFileNum <= 0) {
+                summaryFileNum = checkSQSQueue();
+                if (summaryFileNum <= 0) {
+                    System.out.println("No valid number found in the queue. Retrying...");
+                    try {
+                        Thread.sleep(1000); // Wait for 1 second before retrying
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt(); // Restore interrupted status
+                        throw new RuntimeException("Thread was interrupted while waiting", e);
+                    }
+                }
+            }
+
             HTMLConverter htmlConverter = new HTMLConverter(summaryFileNum);
             htmlConverter.generateHtmlFromMultipleTxtFiles("", outputFileName);
     
