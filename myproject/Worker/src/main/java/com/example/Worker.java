@@ -27,6 +27,11 @@ public class Worker implements Runnable {
             String msg = aws.getMessage(MANAGER_TO_WORKERS_QUEUE_NAME, localAppID);
             if (msg != ""){
                 try{
+                    if (msg.equals("terminate")) {
+                        terminate = true;  // Set terminate flag to true to break the loop
+                        System.out.println("Received termination message. Shutting down worker.");
+                        break;  // Exit the loop and terminate the worker thread
+                    }
                     String[] parts = msg.split(" ");
                     String operation = parts[0]; // Extract operation
                     String url = parts[1];      // Extract URL
@@ -54,6 +59,4 @@ public class Worker implements Runnable {
     private String processFile(String operation, String url) throws IOException {
         return PDFConverter.convertFromUrl(url, operation);
     }
-
-    private void terminate() {}
 }
