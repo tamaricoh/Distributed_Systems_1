@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
-
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.CreateTagsRequest;
 import software.amazon.awssdk.services.ec2.model.Ec2Exception;
@@ -175,43 +174,30 @@ public class AWS {
     }
 
     /**
-     * Checks the specified SQS queue for a message indicating processing completion.
-     * The message format should be a JSON string in the form <inputfile>:::<file_location_in_S3>.
-     *
-     * @param queueName Name of the SQS queue.
-     * @param inputfile Name of the uploaded file.
-     * @return the processed file location in S3 as a String, or "FileNotFound" if no matching message is found.
+     * checks the SQS queue for new tasks.
+     * 
+     * @return A list of messages from the queue.
      */
-    public String checkSQSQueue(String queueName, String inputfile) {
+    private List<String> checkSqsQueue(String queueName) {
+        //this function is not fully writeen and should be remodeled
         try {
-            // Retrieve the queue URL
-            GetQueueUrlRequest getQueueUrlRequest = GetQueueUrlRequest.builder()
-                    .queueName(queueName)
-                    .build();
-
-            GetQueueUrlResponse queueUrlResponse = getInstance().sqs.getQueueUrl(getQueueUrlRequest);
-            String queueUrl = queueUrlResponse.queueUrl();
-
-            // Receive up to 10 messages
+            // Create a request to receive messages
             ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder()
                     .queueUrl(queueUrl)
-                    .maxNumberOfMessages(10)
+                    .maxNumberOfMessages(10) // Adjust based on requirements
+                    .waitTimeSeconds(10) // Long polling for better efficiency
                     .build();
 
-            ReceiveMessageResponse receiveMessageResponse = getInstance().sqs.receiveMessage(receiveMessageRequest);
+            // Retrieve messages from the queue
+            ReceiveMessageResponse response = sqsClient.receiveMessage(receiveMessageRequest);
+            return response.messages().stream()
+                    .map(Message::body) // Extract the message body
+                    .toList();
 
-            // Loop through the received messages
-            for (var message : receiveMessageResponse.messages()) {
-                String messageBody = message.body();
-                String[] parts = messageBody.split(":::");
-                if (parts[0].contentEquals(inputfile)) {
-                    return parts[1];
-                }
-            }
         } catch (SqsException e) {
-            System.err.println("Error checking SQS queue: " + e.awsErrorDetails().errorMessage());
+            System.err.println("Failed to retrieve messages from SQS: " + e.awsErrorDetails().errorMessage());
+            return List.of(); // Return an empty list in case of an error
         }
-        return "FileNotFound"; // Return this if no matching message is found
     }
 
     /**

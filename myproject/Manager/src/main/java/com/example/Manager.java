@@ -1,7 +1,5 @@
 package com.example;
 import java.io.BufferedWriter;
-// import java.io.BufferedReader;
-// import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -10,9 +8,6 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.util.Base64;
 import java.util.List;
-// import java.util.concurrent.ExecutorService;
-// import java.util.concurrent.Executors;
-
 import software.amazon.awssdk.services.sqs.*;
 import software.amazon.awssdk.services.sqs.model.*;
 import software.amazon.awssdk.services.ec2.Ec2Client;
@@ -29,53 +24,25 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.model.Tag;
 
 public class Manager implements Runnable {
-    private static final String LOCALAPP_TO_MANAGER_QUEUE_NAME = "LocalApp-To-Manager";
+    private static final String LOCALAPP_TO_MANAGER_QUEUE_NAME = "LocalApp_To_Manager";
     private static final String MANAGER_TO_LOCALAPP_QUEUE_NAME = "Manager_To_LocalApp";
-    private static final String MANAGER_TO_WORKERS_QUEUE_NAME = "Manager-To-Workers";
-    private static final String WORKERS_TO_MANAGER_QUEUE_NAME = "Workers-To-Manager";
-    private static final String LOCALAPP_TO_MANAGER_BUCKET_NAME = "LocalApp-To-Manager";
-    private static final String WORKERS_TO_MANAGER_BUCKET_NAME = "Workers-To-Manager";
-    public static Region region1 = Region.US_WEST_2;
-    public static Region region2 = Region.US_EAST_1;
-    private static final InstanceType workerType = InstanceType.T2_LARGE;
-    private static final String workerScript = "";
-    // "#!/bin/bash\n" + 
-    // "sudo yum install -y java-1.8.0-openjdk\n" + // Install OpenJDK 8
-    // "aws s3 cp s3://" + BUCKET_JAR_NAME + "/" + workerJarName + " /home/ec2-user/" + workerJarName + "\n"+ // Copy the jar from an S3 bucket to the local /home/ec2-user/ directory TODO: so it will be ok if a LA deletes the jar and it's bucket?
-    // "java -jar /home/ec2-user/"+ workerJarName +"\n";
-
-    private final static String ami = ""; //"ami-00e95a9222311e8ed";
+    private static final String MANAGER_TO_WORKERS_QUEUE_NAME = "Manager_To_Workers";
+    private static final String WORKERS_TO_MANAGER_QUEUE_NAME = "Workers_To_Manager";
+    private static final String LOCALAPP_TO_MANAGER_BUCKET_NAME = "Text_File_Bucket";
     private static final String WORKER_TAG = "Worker";
-
-
-    private static SqsClient sqsClient;
-    private static S3Client s3Client;
-    private static Ec2Client ec2Client;
-    // private int linesPerWorker;
-    // private int numOfTasks;
-    // private String LocalAppID;
+    private static final AWS aws;
+    private static  boolean terminate;
+    private final Set<String> processedTasks;
 
     public Manager() {
-        sqsClient = SqsClient.builder().region(region1).build();
-        s3Client = S3Client.builder().region(region1).build();
-        ec2Client = Ec2Client.builder().region(region2).build();
-        // this.numOfTasks = -1;
-        // this.LocalAppID = "";
+        this.aws = AWS.getInstance();
+        processedTasks = new HashSet<>();
     }
-
-    // Constructor
-    // public Manager(String inputFilePath, int linesPerWorker, long workerTimeout) {
-    //     this.inputFilePath = inputFilePath;
-    //     this.linesPerWorker = linesPerWorker;
-    //     this.workerTimeout = workerTimeout;
-    //     this.threadPool = Executors.newCachedThreadPool(); // Dynamically allocate threads
-    // }
 
     @Override
     public void run() {
         String LocalAppID = "";
         int numOfTasks = 0;
-
         // Step 1: Receive a single message from the LOCALAPP_TO_MANAGER queue
         ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder()
                 .queueUrl(getQueueUrl(LOCALAPP_TO_MANAGER_QUEUE_NAME))
@@ -211,6 +178,27 @@ public class Manager implements Runnable {
             uploadToS3(summaryFilePath);
             sendSQSMessage(summaryFileName);
         }
+    }
+
+    /**
+     * Fetches new tasks from the SQS queue and ensures no task is repeated.
+     *
+     * @return A list of new, unique tasks in the format "<file_location_s3>:::<lines_per_worker>".
+     */
+    public List<String> getNewTasks() {
+        // Retrieve messages from the SQS queue
+        List<String> messages = checkSqsQueue();
+
+        // Filter out tasks that have already been processed
+        return messages.stream()
+                .filter(message -> {
+                    boolean isNewTask = !processedTasks.contains(message);
+                    if (isNewTask) {
+                        processedTasks.add(message); // Mark as processed
+                    }
+                    return isNewTask;
+                })
+                .toList();
     }
 
     private String getQueueUrl(String QueueName) {
