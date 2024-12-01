@@ -4,7 +4,7 @@ import java.io.*;
 // import java.net.*;
 
 
-public class Worker implements Runnable {
+public class Worker{
 
     private static final String MANAGER_TO_WORKERS_QUEUE_NAME = "Manager-To-Workers";
     private static final String WORKERS_TO_MANAGER_BUCKET_NAME = "Workers-To-Manager";
@@ -17,12 +17,12 @@ public class Worker implements Runnable {
     private Boolean terminate;
 
     // Constructor
-    public Worker(String sqsURL) {
+    public Worker() {
         this.terminate = false;
     }
 
-    @Override
-    public void run() {
+    // @Override
+    public void startWorker() {
         while(!terminate){
             String msg = aws.getMessage(MANAGER_TO_WORKERS_QUEUE_NAME, localAppID);
             if (msg != ""){
@@ -58,5 +58,10 @@ public class Worker implements Runnable {
      */
     private String processFile(String operation, String url) throws IOException {
         return PDFConverter.convertFromUrl(url, operation);
+    }
+
+    public static void main(String[] args){
+        Worker worker = new Worker();
+        worker.startWorker();
     }
 }
