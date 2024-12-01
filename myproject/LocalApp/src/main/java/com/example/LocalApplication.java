@@ -56,8 +56,8 @@ public class LocalApplication{
 
         setupAWS();
         String filePathS3 = aws.uploadFileToS3(inputFileName, BUCKET_NAME);
-        if( filePathS3 != null){
-            //shut down and update user. 
+        if( filePathS3 == null){
+            //retry or shut down and update user. 
         }
         //message format - <file_location_s3>:::<lines_per_worker>
         String msg = filePathS3 + dilimeter + n;
