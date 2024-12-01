@@ -2,8 +2,8 @@ package com.example;
 
 public class LocalApplication{
     static String BUCKET_NAME = "Text_File_Bucket";
-    static String SQS_CLIENT = "Client2Manager";
-    static String SQS_READY = "Manager2Client";
+    static String SQS_CLIENT = "LocalApp_To_Manager";
+    static String SQS_READY = "Manager_To_LocalApp";
     static AWS aws = AWS.getInstance();
     static String dilimeter = ":::";
 
@@ -61,7 +61,7 @@ public class LocalApplication{
         }
         //message format - <file_location_s3>:::<lines_per_worker>
         String msg = filePathS3 + dilimeter + n;
-        AWS.sendSQSMessage(msg, SQS_CLIENT);
+        aws.sendSQSMessage(msg, SQS_CLIENT);
         initalizeManager();
         filePathS3 = listen(filePathS3, aws, SQS_READY);
 
