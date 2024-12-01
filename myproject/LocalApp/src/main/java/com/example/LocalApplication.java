@@ -13,36 +13,42 @@ public class LocalApplication{
         htmlConverter.convertToHTML();
         System.out.println("Successfully Converted the input file, you can find the outcome at : " + outputFilePath);
     }
-    //TODO::while listening to the sqsqueue should check if a termination message message received and handle accordingly.
-    public static String listen(String filePath, AWS awsTool, String queueName){
+
+    public static String listenToSQS(String filePath, AWS awsTool, String queueName){
         String summaryFileName = "FileNotFound";
         while (summaryFileName.contentEquals("FileNotFound")) {
-            try {
-                Thread.sleep(1000); // Wait for 1 second before retrying
-            } catch (InterruptedException e) {
-                //should also check if got a termination msg
-                Thread.currentThread().interrupt(); // Restore interrupted status
-                throw new RuntimeException("Thread was interrupted while waiting", e);
-            }
             summaryFileName = awsTool.checkSQSQueue(queueName, filePath);
-            //handle termination1!!
-            /*
-            if(args.length > 3 && args[3].equals("terminate")){
-                terminateManager();
-                summaryFileName = "-";
+            try {
+                Thread.sleep(5000); // Wait for 5 second before retrying
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
-            */
         }
         return summaryFileName;
     }
     
-    //TODO:: implement this function: terminateManager
-    public static void terminateManager() {   
+    //TODO:: terminateManager: should we wait for an update message from the manager on successfull termination?
+    public static void terminateManager() {
+        aws.sendSQSMessage("terminate", SQS_CLIENT);
+        //maybe we want to confirm with the manager that he teminated succesfully?
+        System.out.println("Manager shut down successfully");   
     }
-    //TODO:: implement this function: initalizeManager;
-    //TODO:: implement this function: setupAWS
 
-    // Main method
+    public static void setupAWS(){
+        aws.createBucketIfNotExists(BUCKET_NAME);
+        aws.createSqsQueue(SQS_CLIENT);
+    }
+    //TODO::initalizeManager; formalte the script to run on the ec2 machine
+    public static void initalizeManager(){
+        if(aws.isManagerInstanceRunning()){
+            return;
+        }
+        String script = "run mf"; //here
+        aws.createEC2(script, "Manager", 1);
+
+    }
+
+
     public static void main(String[] args) {
         if (args.length < 3) {
             System.out.println("No args: LocalApplication <inputFileName> <outputFileName> <n> [--terminate]");
@@ -53,25 +59,30 @@ public class LocalApplication{
         String outputFileName = args[1];
         int n = Integer.parseInt(args[2]);
         boolean terminate = args.length > 3 && args[3].equals("terminate");
+        if(!terminate){
+            setupAWS();
+            String filePathS3 = aws.uploadFileToS3(inputFileName, BUCKET_NAME);
+            int tries = 0;
+            while(filePathS3 == null &&  tries < 5){
+                //retry or shut down and update user.
+                filePathS3 = aws.uploadFileToS3(inputFileName, BUCKET_NAME);
+                tries++;
+            }
+            if(tries == 5){
+                System.out.println("Couldn't load your requsted file to the server, please check internet conectivity");
+                System.exit(0);
+            }
+            //message format - <file_location_s3>:::<lines_per_worker>
+            String msg = filePathS3 + dilimeter + n;
+            aws.sendSQSMessage(msg, SQS_CLIENT);
+            initalizeManager();
+            filePathS3 = listenToSQS(filePathS3, aws, SQS_READY);
 
-        setupAWS();
-        String filePathS3 = aws.uploadFileToS3(inputFileName, BUCKET_NAME);
-        if( filePathS3 == null){
-            //retry or shut down and update user. 
+            if(aws.downloadFileFromS3(BUCKET_NAME, filePathS3, outputFileName + ".txt")){
+                processFile(outputFileName + ".txt", outputFileName + ".html");
+            }
         }
-        //message format - <file_location_s3>:::<lines_per_worker>
-        String msg = filePathS3 + dilimeter + n;
-        aws.sendSQSMessage(msg, SQS_CLIENT);
-        initalizeManager();
-        filePathS3 = listen(filePathS3, aws, SQS_READY);
-
-        if(aws.downloadFileFromS3(BUCKET_NAME, filePathS3, outputFileName + ".txt")){
-            processFile(outputFileName + ".txt", outputFileName + ".html");
-        }
-
-
-        // If terminate flag is passed, simulate manager termination
-        if (terminate) {
+        else {
             terminateManager();
         }
     }

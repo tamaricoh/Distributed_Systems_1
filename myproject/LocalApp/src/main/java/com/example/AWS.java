@@ -4,12 +4,16 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
+import java.util.List;
 
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.CreateTagsRequest;
+import software.amazon.awssdk.services.ec2.model.DescribeInstancesRequest;
+import software.amazon.awssdk.services.ec2.model.DescribeInstancesResponse;
 import software.amazon.awssdk.services.ec2.model.Ec2Exception;
 import software.amazon.awssdk.services.ec2.model.IamInstanceProfileSpecification;
 import software.amazon.awssdk.services.ec2.model.InstanceType;
+import software.amazon.awssdk.services.ec2.model.Reservation;
 import software.amazon.awssdk.services.ec2.model.RunInstancesRequest;
 import software.amazon.awssdk.services.ec2.model.RunInstancesResponse;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -32,6 +36,7 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.model.Tag;
+import software.amazon.awssdk.services.ec2.model.Filter;
 public class AWS {
     private final S3Client s3;
     private final SqsClient sqs;
@@ -131,6 +136,45 @@ public class AWS {
             System.exit(1);
         }
         return instanceId;
+    }
+
+    /**
+     * Checks if there is any running EC2 instance with the tag "Name" = "Manager".
+     *
+     * @return true if such an instance exists, false otherwise.
+     */
+    public boolean isManagerInstanceRunning() {
+        // Define a filter for the tag "Name=Manager"
+        Filter tagFilter = Filter.builder()
+                .name("tag:Name")
+                .values("Manager")
+                .build();
+
+        // Define a filter for the instance state "running"
+        Filter stateFilter = Filter.builder()
+                .name("instance-state-name")
+                .values("running")
+                .build();
+
+        // Build the describe instances request with the filters
+        DescribeInstancesRequest request = DescribeInstancesRequest.builder()
+                .filters(tagFilter, stateFilter)
+                .build();
+
+        // Retrieve the instances
+        DescribeInstancesResponse response = getInstance().ec2.describeInstances(request);
+        List<Reservation> reservations = response.reservations();
+
+        // Check if there are any instances matching the filters
+        for (Reservation reservation : reservations) {
+            if (!reservation.instances().isEmpty()) {
+                System.out.println("[DEBUG] Manager instance is already running.");
+                return true;
+            }
+        }
+
+        System.out.println("[DEBUG] No running Manager instance found.");
+        return false;
     }
 
     /**
