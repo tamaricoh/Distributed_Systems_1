@@ -7,9 +7,12 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Writer;
 import java.io.FileWriter;
+import java.net.MalformedURLException;
 import java.net.URL;
 
 public class PDFConverter {
@@ -48,51 +51,78 @@ public class PDFConverter {
         }
     }
 
-    public static String convertFromUrl(String PDFfile, String operation) throws IOException {
-        // URL url = new URL(urlString);
-        // File tempPdf = File.createTempFile("downloaded", ".pdf");
-        // tempPdf.deleteOnExit();
-    
-        // try {
-        //     // Download PDF
-        //     try (java.io.InputStream in = url.openStream()) {
-        //         java.nio.file.Files.copy(in, tempPdf.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-        //     }
-    
-        //     String baseFileName = tempPdf.getAbsolutePath().replace(".pdf", "");
-        //     String outputPath;
-    
-            // Handle different operations
-            String baseFileName = PDFfile.replace(".pdf", "");
-            String outputPath;
+    public static String convertFromUrl(String url, String operation) throws IOException {
+        // Define the destination where the file will be saved locally
+        String destinationFile = "downloaded_file.pdf";  // Modify this as needed
+        
+        // First, download the file
+        String downloadResult = downloadFile(url, destinationFile);
+        if (downloadResult != null) {
+            // If the download fails, return the error message
+            return downloadResult;
+        }
+
+        // Proceed with the conversion after downloading the file
+        String baseFileName = destinationFile.replace(".pdf", "");
+        String outputPath;
+
+        try {
             switch (operation.toUpperCase()) {
                 case "TOIMAGE":
                     outputPath = baseFileName + ".png";
-                    convertToImage(PDFfile, outputPath);
+                    convertToImage(destinationFile, outputPath);
                     break;
                 case "TOTEXT":
                     outputPath = baseFileName + ".txt";
-                    convertToText(PDFfile, outputPath);
+                    convertToText(destinationFile, outputPath);
                     break;
                 case "TOHTML":
                     outputPath = baseFileName + ".html";
-                    try { // --------------------------------------------
-                        convertToHTML(PDFfile, outputPath);
-                    } catch (IOException e) {
-                        // Return an error message when HTML conversion fails
-                        return "Error: Unable to convert PDF to HTML. Reason: " + e.getMessage();
-                    }
+                    convertToHTML(destinationFile, outputPath);
                     break;
                 default:
                     throw new IllegalArgumentException("Unsupported operation: " + operation);
             }
-    
-            // Return the URL of the output file
+
+            // Return the URL of the output file (successful case)
             return new File(outputPath).toURI().toString();
-    
-        // } catch (IOException e) {
-        //     // Catch any IOException, including file download or conversion issues
-        //     return "Error: Unable to download or process PDF. Reason: " + e.getMessage();
-        // }
+
+        } catch (IOException e) {
+            // Return an error message if conversion fails
+            return "Error: Unable to convert PDF to " + operation + ". Reason: " + e.getMessage();
+        }
+    }
+
+    // Download function which returns a string indicating the result
+    private static String downloadFile(String url, String destinationFile) {
+        // Check if the file exists and delete it if needed
+        File file = new File(destinationFile);
+        if (file.exists()) {
+            System.out.println("File already exists, it will be overwritten.");
+            file.delete();
+        }
+
+        try {
+            // Create a URL object from the provided URL string
+            URL fileUrl = new URL(url);
+
+            // Open an input stream from the URL (i.e., downloading the file)
+            try (InputStream inputStream = fileUrl.openStream();
+                FileOutputStream fileOutputStream = new FileOutputStream(destinationFile)) {
+
+                byte[] buffer = new byte[4096];
+                int bytesRead;
+
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    fileOutputStream.write(buffer, 0, bytesRead);
+                }
+                System.out.println("File downloaded successfully to: " + destinationFile);
+                return null; // Indicate successful download
+            }
+        } catch (MalformedURLException e) {
+            return "Error: Invalid URL format. " + e.getMessage();
+        } catch (IOException e) {
+            return "Error: Unable to download file. " + e.getMessage();
+        }
     }
 }
