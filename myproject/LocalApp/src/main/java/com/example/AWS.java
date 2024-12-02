@@ -22,8 +22,11 @@ import software.amazon.awssdk.services.s3.model.CreateBucketConfiguration;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.CreateQueueRequest;
 import software.amazon.awssdk.services.sqs.model.GetQueueUrlRequest;
@@ -314,5 +317,71 @@ public class AWS {
         }
     }
 
+    /**
+ * Uploads a JAR file to an S3 bucket if it does not already exist in the bucket.
+ * Returns the full S3 file path of the uploaded file.
+ *
+ * @param filePath   Path to the JAR file on the local machine.
+ * @param bucketName Name of the S3 bucket.
+ * @return The full S3 file path of the uploaded JAR file.
+ */
+public String uploadJar(String filePath, String bucketName) {
+    // Extract the file name from the file path
+    Path path = Paths.get(filePath);
+    String fileName = path.getFileName().toString();
+
+    try {
+        // Check if the file already exists in the bucket
+        boolean fileExists = checkIfFileExistsInS3(bucketName, fileName);
+
+        if (fileExists) {
+            System.out.println("File already exists in the bucket: " + fileName);
+        } else {
+            // If the file does not exist, upload it
+            String fileKey = uploadFileToS3(filePath, bucketName);
+            System.out.println("File successfully uploaded to the bucket: " + fileName);
+            return "s3://" + bucketName + "/" + fileKey;
+        }
+
+        // Return the S3 path if the file already exists
+        return "s3://" + bucketName + "/" + fileName;
+    } catch (S3Exception e) {
+        throw new RuntimeException("Error during file upload process: " + e.awsErrorDetails().errorMessage(), e);
+    }
+}
+
+    /**
+     * Checks if a file with the specified name exists in the given S3 bucket.
+     *
+     * @param bucketName Name of the S3 bucket.
+     * @param fileName   Name of the file to check.
+     * @return True if the file exists, false otherwise.
+     */
+    private boolean checkIfFileExistsInS3(String bucketName, String fileName) {
+        // List objects in the bucket and check for a match with the file name
+        ListObjectsV2Request listObjectsRequest = ListObjectsV2Request.builder()
+                .bucket(bucketName)
+                .prefix(fileName) // Search with the file name as a prefix for efficiency
+                .build();
+
+        ListObjectsV2Response response = s3.listObjectsV2(listObjectsRequest);
+        for (S3Object object : response.contents()) {
+            if (object.key().equals(fileName)) {
+                return true; // File exists
+            }
+        }
+        return false; // File does not exist
+    }
+
+    public String generateManagerUserDataScript(String bucketName, String jarFilePath, String queueName) {
+        String script = String.join("\n",
+            "#!/bin/bash",
+            "sudo yum update -y",
+            "sudo yum install -y java-1.8.0-openjdk", // Install Java if needed
+            "aws s3 cp s3://" + bucketName + "/" + Paths.get(jarFilePath).getFileName() + " /home/ec2-user/manager.jar",
+            "java -jar /home/ec2-user/manager.jar " + queueName // Run the JAR with the queue name as an argument
+        );
+        return script;
+    }
 
 }
