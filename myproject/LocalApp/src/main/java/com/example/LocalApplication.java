@@ -1,9 +1,13 @@
 package com.example;
 
 public class LocalApplication{
-    static String BUCKET_NAME = "Text_File_Bucket";
+    private static String MANAGER_JAR = "";
+    private static String WORKER_JAR = "";
+    private static String EC2_BUCKET = "Jar_Bucket";
+    private static String CLIENT_BUCKET = "Text_File_Bucket";
     static String SQS_CLIENT = "LocalApp_To_Manager";
     static String SQS_READY = "Manager_To_LocalApp";
+
     static AWS aws = AWS.getInstance();
     static String dilimeter = ":::";
 
@@ -26,16 +30,9 @@ public class LocalApplication{
         }
         return summaryFileName;
     }
-    
-    //TODO:: terminateManager: should we wait for an update message from the manager on successfull termination?
-    public static void terminateManager() {
-        aws.sendSQSMessage("terminate", SQS_CLIENT);
-        //maybe we want to confirm with the manager that he teminated succesfully?
-        System.out.println("Manager shut down successfully");   
-    }
 
     public static void setupAWS(){
-        aws.createBucketIfNotExists(BUCKET_NAME);
+        aws.createBucketIfNotExists(CLIENT_BUCKET);
         aws.createSqsQueue(SQS_CLIENT);
     }
     //TODO::initalizeManager; formalte the script to run on the ec2 machine
@@ -43,11 +40,20 @@ public class LocalApplication{
         if(aws.isManagerInstanceRunning()){
             return;
         }
-        String script = "run mf"; //here
-        aws.createEC2(script, "Manager", 1);
+        aws.createBucketIfNotExists(EC2_BUCKET);
+        String manager_path_s3 = aws.uploadJar(MANAGER_JAR, EC2_BUCKET);
+        aws.uploadJar(WORKER_JAR, EC2_BUCKET);
+        String userDataScript = aws.generateManagerUserDataScript(EC2_BUCKET, manager_path_s3, SQS_CLIENT);
+        aws.createEC2(userDataScript, "Manager", 1);
 
     }
 
+    //TODO:: terminateManager: should we wait for an update message from the manager on successfull termination?
+    public static void terminateManager() {
+        aws.sendSQSMessage("terminate", SQS_CLIENT);
+        //maybe we want to confirm with the manager that he teminated succesfully?
+        System.out.println("Manager shut down successfully");   
+    }
 
     public static void main(String[] args) {
         if (args.length < 3) {
@@ -61,11 +67,11 @@ public class LocalApplication{
         boolean terminate = args.length > 3 && args[3].equals("terminate");
         if(!terminate){
             setupAWS();
-            String filePathS3 = aws.uploadFileToS3(inputFileName, BUCKET_NAME);
+            String filePathS3 = aws.uploadFileToS3(inputFileName, CLIENT_BUCKET);
             int tries = 0;
             while(filePathS3 == null &&  tries < 5){
                 //retry or shut down and update user.
-                filePathS3 = aws.uploadFileToS3(inputFileName, BUCKET_NAME);
+                filePathS3 = aws.uploadFileToS3(inputFileName, CLIENT_BUCKET);
                 tries++;
             }
             if(tries == 5){
@@ -78,7 +84,7 @@ public class LocalApplication{
             initalizeManager();
             filePathS3 = listenToSQS(filePathS3, aws, SQS_READY);
 
-            if(aws.downloadFileFromS3(BUCKET_NAME, filePathS3, outputFileName + ".txt")){
+            if(aws.downloadFileFromS3(CLIENT_BUCKET, filePathS3, outputFileName + ".txt")){
                 processFile(outputFileName + ".txt", outputFileName + ".html");
             }
         }
