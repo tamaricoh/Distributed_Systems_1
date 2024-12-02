@@ -22,6 +22,7 @@ public class LocalApplication{
         String summaryFileName = "FileNotFound";
         while (summaryFileName.contentEquals("FileNotFound")) {
             summaryFileName = awsTool.checkSQSQueue(queueName, filePath);
+            //move key to file location
             try {
                 Thread.sleep(5000); // Wait for 5 second before retrying
             } catch (InterruptedException e) {

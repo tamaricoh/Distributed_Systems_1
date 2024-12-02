@@ -6,8 +6,8 @@ import java.io.*;
 
 public class Worker{
 
-    private static final String MANAGER_TO_WORKERS_QUEUE_NAME = "Manager-To-Workers";
-    private static final String WORKERS_TO_MANAGER_BUCKET_NAME = "Workers-To-Manager";
+    private static final String MANAGER_TO_WORKERS_QUEUE_NAME = "Manager_To_Workers";
+    private static final String WORKERS_TO_MANAGER_BUCKET_NAME = "Workers_To_Manager";
 
     // String linesPerWorker = System.getenv("LINES_PER_WORKER");
     String localAppID = System.getenv("LOCAL_APP_ID");
@@ -35,13 +35,10 @@ public class Worker{
                     String[] parts = msg.split(" ");
                     String operation = parts[0]; // Extract operation
                     String url = parts[1];      // Extract URL
-                    // downloadFile(url);
                     String newURL = processFile(operation, url);
-
-                    // If newURL is empty, handle the error - write it!!!!!!!!!!1
-    
                     aws.uploadFileToS3(url, newURL, operation, WORKERS_TO_MANAGER_BUCKET_NAME, localAppID);
-                    // check if terminate??
+                    // should send update masseage to workermanager
+                    // should handle termination message
                 } catch (Exception e) {
                     System.err.println("Error while processing the task: " + e.getMessage());  
                 }
