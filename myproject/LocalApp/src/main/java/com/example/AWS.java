@@ -66,9 +66,7 @@ public class AWS {
      */
     public static AWS getInstance() {
         return instance;
-    }
-
-    public String bucketName = "text_file_bucket"; 
+    } 
 
     /**
      * Creates an S3 bucket if it does not already exist.
@@ -198,6 +196,7 @@ public class AWS {
      * @param message   Content of the message.
      * @param queueName Name of the SQS queue.
      */
+
     public void sendSQSMessage(String message, String queueName) {
         try {
             // Retrieve the queue URL
