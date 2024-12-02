@@ -2,11 +2,13 @@ package com.example;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Manager {
 
     private static final int THREAD_POOL_SIZE = 5;
     private ExecutorService threadPool;
+    public AtomicInteger availableWorkers = new AtomicInteger(14);; 
 
     public Manager() {
         // Initialize the thread pool with a fixed size of 5
@@ -42,5 +44,9 @@ public class Manager {
     // Submit tasks to the thread pool
     public void submitTask(Runnable task) {
         threadPool.submit(task);
+    }
+
+    public int getAvailableWorkers() {
+        return availableWorkers.get();
     }
 }

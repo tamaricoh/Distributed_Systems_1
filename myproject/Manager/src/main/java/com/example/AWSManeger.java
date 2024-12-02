@@ -5,23 +5,31 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
-import java.util.List;
+// import java.util.List;
 
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.CreateTagsRequest;
 import software.amazon.awssdk.services.ec2.model.Ec2Exception;
 import software.amazon.awssdk.services.ec2.model.IamInstanceProfileSpecification;
-import software.amazon.awssdk.services.ec2.model.Instance;
+// import software.amazon.awssdk.services.ec2.model.Instance;
 import software.amazon.awssdk.services.ec2.model.InstanceType;
 import software.amazon.awssdk.services.ec2.model.RunInstancesRequest;
 import software.amazon.awssdk.services.ec2.model.RunInstancesResponse;
 import software.amazon.awssdk.services.ec2.model.Tag;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.BucketLocationConstraint;
+import software.amazon.awssdk.services.s3.model.CreateBucketConfiguration;
+import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.sqs.model.CreateQueueRequest;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
 import software.amazon.awssdk.services.sqs.model.GetQueueUrlRequest;
 import software.amazon.awssdk.services.sqs.model.GetQueueUrlResponse;
@@ -33,7 +41,6 @@ import software.amazon.awssdk.services.sqs.model.SqsException;
 public class AWSManeger {
     private final S3Client s3Client;
     private final SqsClient sqsClient;
-    private final Ec2Client ec2Client;
 
     public static String ami = "ami-00e95a9222311e8ed";
 
@@ -46,7 +53,6 @@ public class AWSManeger {
     private AWSManeger() {
         s3Client = S3Client.builder().region(region1).build();
         sqsClient = SqsClient.builder().region(region1).build();
-        ec2Client = Ec2Client.builder().region(region1).build();
     }
 
     /**
@@ -226,48 +232,105 @@ public class AWSManeger {
         }
     }
 
-    public void Bootstrap(){
-        // public static void createEC2(String script, String tagName, InstanceType insType) {
-        //     // Create the request to launch a single EC2 instance
-        //     RunInstancesRequest runRequest = RunInstancesRequest.builder()
-        //             .instanceType(insType) // The EC2 instance type 
-        //             .imageId(ami) // The AMI ID for your EC2 instance
-        //             .maxCount(1) // Always create 1 instance
-        //             .minCount(1) // Always create 1 instance
-        //             .keyName("vockey") // Your EC2 key pair for SSH access
-        //             .iamInstanceProfile(IamInstanceProfileSpecification.builder().name("LabInstanceProfile").build()) // IAM role
-        //             .userData(Base64.getEncoder().encodeToString(script.getBytes())) // Base64 encode the bootstrap script
-        //             .build();
-            
-        //     // Send the request to launch the EC2 instance
-        //     RunInstancesResponse response = ec2Client.runInstances(runRequest);
-            
-        //     // Extract the instance ID and tag the launched instance
-        //     List<Instance> instances = response.instances();
-        //     String instanceId = null; // Default value to handle case if no instances are returned
-        //     for (Instance instance : instances) {
-        //         instanceId = instance.instanceId(); // Capture the instance ID of the first instance created
-            
-        //         // Create a tag to identify the EC2 instance
-        //         software.amazon.awssdk.services.ec2.model.Tag tag = Tag.builder()
-        //                 .key("Name")
-        //                 .value(tagName) // The tag name you want for the EC2 instance
-        //                 .build();
-                
-        //         // Create the request to apply the tag
-        //         CreateTagsRequest tagRequest = CreateTagsRequest.builder()
-        //                 .resources(instanceId) // The EC2 instance to tag
-        //                 .tags(tag) // The tags to apply
-        //                 .build();
-        
-        //         try {
-        //             ec2Client.createTags(tagRequest); // Apply the tag
-        //             System.out.printf("[DEBUG] Successfully started EC2 instance %s with tag %s\n", instanceId, tagName);
-        //         } catch (Ec2Exception e) {
-        //             System.err.println("[ERROR] " + e.getMessage());
-        //             System.exit(1); // Exit on failure (you might want to handle this more gracefully)
-        //         }
-        //     }
-        // }
+    public String createEC2(String script, String tagName, int numberOfInstances) {
+        Ec2Client ec2 = Ec2Client.builder().region(region2).build();
+
+        // Configure the instance launch request
+        RunInstancesRequest runRequest = RunInstancesRequest.builder()
+                .instanceType(InstanceType.M4_LARGE)
+                .imageId(ami)
+                .maxCount(numberOfInstances)
+                .minCount(1)
+                .keyName("vockey")
+                .iamInstanceProfile(IamInstanceProfileSpecification.builder().name("LabInstanceProfile").build())
+                .userData(Base64.getEncoder().encodeToString((script).getBytes()))
+                .build();
+
+        // Launch the instances
+        RunInstancesResponse response = ec2.runInstances(runRequest);
+        String instanceId = response.instances().get(0).instanceId();
+
+        // Tag the instance with the provided tag
+        CreateTagsRequest tagRequest = CreateTagsRequest.builder()
+                .resources(instanceId)
+                .tags(Tag.builder()
+                        .key("Name")
+                        .value(tagName)
+                        .build())
+                .build();
+
+        try {
+            ec2.createTags(tagRequest);
+            System.out.printf("[DEBUG] Successfully started EC2 instance %s based on AMI %s\n", instanceId, ami);
+        } catch (Ec2Exception e) {
+            System.err.println("[ERROR] " + e.getMessage());
+            System.exit(1);
+        }
+        return instanceId;
+    }
+
+    public String generateWorkerDataScript(String BUCKET_NAME, String jarFilePath, String LocalAppID) {
+        String script = String.join("\n",
+            "#!/bin/bash",
+            "sudo yum update -y",
+            "sudo yum install -y java-1.8.0-openjdk", // Install Java if needed
+            "aws s3 cp s3://" + BUCKET_NAME + "/" + Paths.get(jarFilePath).getFileName() + " /home/ec2-user/manager.jar",
+            "export LOCAL_APP_ID=" + LocalAppID // Set LOCAL_APP_ID environment variable
+        );
+        return script;
+    }
+
+    public boolean checkIfFileExistsInS3(String BUCKET_NAME, String fileName) {
+        // List objects in the bucket and check for a match with the file name
+        ListObjectsV2Request listObjectsRequest = ListObjectsV2Request.builder()
+                .bucket(BUCKET_NAME)
+                .prefix(fileName) // Search with the file name as a prefix for efficiency
+                .build();
+
+        ListObjectsV2Response response = s3Client.listObjectsV2(listObjectsRequest);
+        for (S3Object object : response.contents()) {
+            if (object.key().equals(fileName)) {
+                return true; // File exists
+            }
+        }
+        return false; // File does not exist
+    }
+
+    /**
+     * Creates an S3 bucket if it does not already exist.
+     *
+     * @param bucketName Name of the bucket to create.
+     */
+    public void createBucketIfNotExists(String bucketName) {
+        try {
+            // Create the bucket with the specified configuration
+            s3Client.createBucket(CreateBucketRequest
+                    .builder()
+                    .bucket(bucketName)
+                    .createBucketConfiguration(
+                            CreateBucketConfiguration.builder()
+                                    .locationConstraint(BucketLocationConstraint.US_WEST_2)
+                                    .build())
+                    .build());
+
+            // Wait until the bucket exists
+            s3Client.waiter().waitUntilBucketExists(HeadBucketRequest.builder()
+                    .bucket(bucketName)
+                    .build());
+        } catch (S3Exception e) {
+            System.out.println(e.getMessage());
+        }
+    }
+
+    /**
+     * Creates an SQS queue with the specified name.
+     *
+     * @param queueName Name of the queue to create.
+     */
+    public void createSqsQueue(String queueName) {
+        CreateQueueRequest createQueueRequest = CreateQueueRequest.builder()
+                .queueName(queueName)
+                .build();
+        sqsClient.createQueue(createQueueRequest);
     }
 }
