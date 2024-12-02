@@ -4,16 +4,11 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
-import java.util.List;
-
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.CreateTagsRequest;
-import software.amazon.awssdk.services.ec2.model.DescribeInstancesRequest;
-import software.amazon.awssdk.services.ec2.model.DescribeInstancesResponse;
 import software.amazon.awssdk.services.ec2.model.Ec2Exception;
 import software.amazon.awssdk.services.ec2.model.IamInstanceProfileSpecification;
 import software.amazon.awssdk.services.ec2.model.InstanceType;
-import software.amazon.awssdk.services.ec2.model.Reservation;
 import software.amazon.awssdk.services.ec2.model.RunInstancesRequest;
 import software.amazon.awssdk.services.ec2.model.RunInstancesResponse;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -36,7 +31,6 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.model.Tag;
-import software.amazon.awssdk.services.ec2.model.Filter;
 public class AWS {
     private final S3Client s3;
     private final SqsClient sqs;
@@ -139,45 +133,6 @@ public class AWS {
     }
 
     /**
-     * Checks if there is any running EC2 instance with the tag "Name" = "Manager".
-     *
-     * @return true if such an instance exists, false otherwise.
-     */
-    public boolean isManagerInstanceRunning() {
-        // Define a filter for the tag "Name=Manager"
-        Filter tagFilter = Filter.builder()
-                .name("tag:Name")
-                .values("Manager")
-                .build();
-
-        // Define a filter for the instance state "running"
-        Filter stateFilter = Filter.builder()
-                .name("instance-state-name")
-                .values("running")
-                .build();
-
-        // Build the describe instances request with the filters
-        DescribeInstancesRequest request = DescribeInstancesRequest.builder()
-                .filters(tagFilter, stateFilter)
-                .build();
-
-        // Retrieve the instances
-        DescribeInstancesResponse response = getInstance().ec2.describeInstances(request);
-        List<Reservation> reservations = response.reservations();
-
-        // Check if there are any instances matching the filters
-        for (Reservation reservation : reservations) {
-            if (!reservation.instances().isEmpty()) {
-                System.out.println("[DEBUG] Manager instance is already running.");
-                return true;
-            }
-        }
-
-        System.out.println("[DEBUG] No running Manager instance found.");
-        return false;
-    }
-
-    /**
      * Creates an SQS queue with the specified name.
      *
      * @param queueName Name of the queue to create.
@@ -219,43 +174,30 @@ public class AWS {
     }
 
     /**
-     * Checks the specified SQS queue for a message indicating processing completion.
-     * The message format should be a JSON string in the form <inputfile>:::<file_location_in_S3>.
-     *
-     * @param queueName Name of the SQS queue.
-     * @param inputfile Name of the uploaded file.
-     * @return the processed file location in S3 as a String, or "FileNotFound" if no matching message is found.
+     * checks the SQS queue for new tasks.
+     * 
+     * @return A list of messages from the queue.
      */
-    public String checkSQSQueue(String queueName, String inputfile) {
+    private List<String> checkSqsQueue(String queueName) {
+        //this function is not fully writeen and should be remodeled
         try {
-            // Retrieve the queue URL
-            GetQueueUrlRequest getQueueUrlRequest = GetQueueUrlRequest.builder()
-                    .queueName(queueName)
-                    .build();
-
-            GetQueueUrlResponse queueUrlResponse = getInstance().sqs.getQueueUrl(getQueueUrlRequest);
-            String queueUrl = queueUrlResponse.queueUrl();
-
-            // Receive up to 10 messages
+            // Create a request to receive messages
             ReceiveMessageRequest receiveMessageRequest = ReceiveMessageRequest.builder()
                     .queueUrl(queueUrl)
-                    .maxNumberOfMessages(10)
+                    .maxNumberOfMessages(10) // Adjust based on requirements
+                    .waitTimeSeconds(10) // Long polling for better efficiency
                     .build();
 
-            ReceiveMessageResponse receiveMessageResponse = getInstance().sqs.receiveMessage(receiveMessageRequest);
+            // Retrieve messages from the queue
+            ReceiveMessageResponse response = sqsClient.receiveMessage(receiveMessageRequest);
+            return response.messages().stream()
+                    .map(Message::body) // Extract the message body
+                    .toList();
 
-            // Loop through the received messages
-            for (var message : receiveMessageResponse.messages()) {
-                String messageBody = message.body();
-                String[] parts = messageBody.split(":::");
-                if (parts[0].contentEquals(inputfile)) {
-                    return parts[1];
-                }
-            }
         } catch (SqsException e) {
-            System.err.println("Error checking SQS queue: " + e.awsErrorDetails().errorMessage());
+            System.err.println("Failed to retrieve messages from SQS: " + e.awsErrorDetails().errorMessage());
+            return List.of(); // Return an empty list in case of an error
         }
-        return "FileNotFound"; // Return this if no matching message is found
     }
 
     /**
