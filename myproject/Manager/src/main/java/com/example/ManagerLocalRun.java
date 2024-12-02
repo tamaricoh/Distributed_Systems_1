@@ -8,10 +8,9 @@ import java.nio.file.Path;
 public class ManagerLocalRun implements Runnable {
 
     private static final String LOCALAPP_TO_MANAGER_QUEUE_NAME = "LocalApp-To-Manager";
-    // private static final String MANAGER_TO_LOCALAPP_QUEUE_NAME = "Manager_To_LocalApp";
-    private static final String LOCALAPP_TO_MANAGER_BUCKET_NAME = "LocalApp-To-Manager";
     private static final String MANAGER_TO_WORKERS_QUEUE_NAME = "Manager-To-Workers";
-
+    private static final String LOCALAPP_TO_MANAGER_BUCKET_NAME = "LocalApp-To-Manager";
+    
     static AWSManeger aws = AWSManeger.getInstance();
     private Boolean terminate;
 
@@ -84,6 +83,7 @@ public class ManagerLocalRun implements Runnable {
      * @param numOfTasks     Total number of tasks generated.
      */
     private void bootstrap(int linesPerWorker, int numOfTasks) {
+        // here we will create a thread that runs ManagerWorkerRun!!!!!!!!!!!1
         // Implementation to be added
     }
 }
