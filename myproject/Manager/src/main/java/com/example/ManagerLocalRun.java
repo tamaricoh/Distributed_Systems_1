@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.UUID;
 
 public class ManagerLocalRun implements Runnable {
 
@@ -13,9 +14,11 @@ public class ManagerLocalRun implements Runnable {
     
     static AWSManeger aws = AWSManeger.getInstance();
     private Boolean terminate;
+    private Manager manager;
 
-    public ManagerLocalRun() {
+    public ManagerLocalRun(Manager manager) {
         terminate = false;
+        this.manager = manager;
     }
 
     @Override
@@ -83,7 +86,11 @@ public class ManagerLocalRun implements Runnable {
      * @param numOfTasks     Total number of tasks generated.
      */
     private void bootstrap(int linesPerWorker, int numOfTasks) {
-        // here we will create a thread that runs ManagerWorkerRun!!!!!!!!!!!1
+        
         // Implementation to be added
+
+        // here we will create a thread that runs ManagerWorkerRun
+        ManagerWorkerRun workerTask = new ManagerWorkerRun(linesPerWorker, numOfTasks, UUID.randomUUID().toString());
+        manager.submitTask(workerTask);
     }
 }
