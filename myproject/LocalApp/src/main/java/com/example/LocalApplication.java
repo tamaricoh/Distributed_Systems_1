@@ -9,7 +9,7 @@ public class LocalApplication{
     static String SQS_READY = "Manager_To_LocalApp";
 
     static AWS aws = AWS.getInstance();
-    static String dilimeter = ":::";
+    static String dilimeter = " ";
 
     // Method to process the file
     public static void processFile(String inputFilePath, String outputFilePath) {
