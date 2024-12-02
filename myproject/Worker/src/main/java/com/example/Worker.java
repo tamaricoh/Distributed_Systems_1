@@ -9,7 +9,7 @@ public class Worker{
     private static final String MANAGER_TO_WORKERS_QUEUE_NAME = "Manager-To-Workers";
     private static final String WORKERS_TO_MANAGER_BUCKET_NAME = "Workers-To-Manager";
 
-    String linesPerWorker = System.getenv("LINES_PER_WORKER");
+    // String linesPerWorker = System.getenv("LINES_PER_WORKER");
     String localAppID = System.getenv("LOCAL_APP_ID");
 
 

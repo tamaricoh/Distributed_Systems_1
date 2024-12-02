@@ -87,7 +87,7 @@ public class AWS {
         try {
             // Create a request to receive messages
             ReceiveMessageRequest receiveRequest = ReceiveMessageRequest.builder()
-                    .queueUrl(getQueueUrl(QUEUE_NAME + "/" + localAppID))
+                    .queueUrl(getQueueUrl(QUEUE_NAME + "_" + localAppID))
                     .maxNumberOfMessages(1) // Process one message at a time
                     .waitTimeSeconds(10) // Long polling
                     .build();
@@ -114,7 +114,7 @@ public class AWS {
             System.out.println("URL: " + url);
 
             // Delete the message from the queue after processing
-            deleteMessage(QUEUE_NAME + "/" + localAppID, message.receiptHandle());
+            deleteMessage(QUEUE_NAME + "_" + localAppID, message.receiptHandle());
 
             return operation + " " + url;
         } catch (Exception e) {
@@ -213,7 +213,7 @@ public class AWS {
 
             // Send the message to the SQS queue
             SendMessageRequest sendMessageRequest = SendMessageRequest.builder()
-                    .queueUrl(getQueueUrl(QUEUE_NAME + "/" + localAppID))
+                    .queueUrl(getQueueUrl(QUEUE_NAME + "_" + localAppID))
                     .messageBody(messageBody)
                     .build();
 
