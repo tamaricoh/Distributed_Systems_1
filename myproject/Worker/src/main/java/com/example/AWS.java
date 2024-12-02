@@ -82,8 +82,10 @@ public class AWS {
      * @param QUEUE_NAME The name of the SQS queue.
      * @param localAppID The application ID for scoping the queue.
      * @return The operation and URL extracted from the message, or an empty string if no messages were found.
-     */
+     */ 
     public String getMessage(String QUEUE_NAME, String localAppID) {
+        //TODO: try to figure how two workers are not working on the same message
+        //TODO: update worker so it won't delete the message and not handle it
         try {
             // Create a request to receive messages
             ReceiveMessageRequest receiveRequest = ReceiveMessageRequest.builder()
@@ -106,14 +108,15 @@ public class AWS {
 
             // Parse the message body (assumes the body format is fixed)
             String[] parts = body.split(" ");
-            String operation = parts[1]; // Extract operation
-            String url = parts[3];      // Extract URL
+            String operation = parts[0]; // Extract operation
+            String url = parts[1];      // Extract URL
 
             System.out.println("Received message:");
             System.out.println("Operation: " + operation);
             System.out.println("URL: " + url);
 
-            // Delete the message from the queue after processing
+            // Delete the message from the queue after processing 
+            //problemmm
             deleteMessage(QUEUE_NAME + "_" + localAppID, message.receiptHandle());
 
             return operation + " " + url;
