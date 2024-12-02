@@ -4,15 +4,15 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.UUID;
+// import java.util.UUID;
 
 // import com.ibm.j9ddr.vm29.structure.stat;
 
 public class ManagerLocalRun implements Runnable {
 
-    private static final String LOCALAPP_TO_MANAGER_QUEUE_NAME = "LocalApp-To-Manager";
-    private static final String MANAGER_TO_WORKERS_QUEUE_NAME = "Manager-To-Workers";
-    private static final String WORKERS_TO_MANAGER_QUEUE_NAME = "Worker-To-Manager";
+    private static final String LOCALAPP_TO_MANAGER_QUEUE_NAME = "LocalApp_To_Manager";
+    private static final String MANAGER_TO_WORKERS_QUEUE_NAME = "Manager_To_Workers";
+    private static final String WORKERS_TO_MANAGER_QUEUE_NAME = "Worker_To_Manager";
     // private static final String LOCALAPP_TO_MANAGER_BUCKET_NAME = "LocalApp-To-Manager";
     private static String CLIENT_BUCKET = "Text_File_Bucket";
     private static String EC2_BUCKET = "Jar_Bucket";
@@ -31,14 +31,18 @@ public class ManagerLocalRun implements Runnable {
     public void run() {
         while (!terminate) {
             String[] msg = aws.getMessage(LOCALAPP_TO_MANAGER_QUEUE_NAME);
-            if (msg == null || msg.length < 2) {
+            if (msg == null) {
                 continue; // Skip if no valid message is received
+            }
+            if (msg.length == 1 && msg[0] == "terminate"){
+                terminate();
+                break;
             }
 
             String s3Location = msg[0];
             String linesPerWorkerStr = msg[1];
             int linesPerWorker = Integer.parseInt(linesPerWorkerStr);
-            String LocalAppID = UUID.randomUUID().toString();
+            String LocalAppID = s3Location;
 
             Path path = aws.downloadFileFromS3(s3Location, CLIENT_BUCKET);
             if (path != null) {
@@ -115,5 +119,9 @@ public class ManagerLocalRun implements Runnable {
         aws.checkIfFileExistsInS3(EC2_BUCKET, WORKER_JAR);
         String workerDataScript = aws.generateWorkerDataScript(BUCKET_NAME, WORKER_JAR, LocalAppID);
         aws.createEC2(workerDataScript, tag, num);
+    }
+
+    private void terminate(){
+        terminate = true; 
     }
 }
