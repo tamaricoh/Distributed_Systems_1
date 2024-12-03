@@ -5,7 +5,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.List;
-
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.Properties;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.CreateTagsRequest;
 import software.amazon.awssdk.services.ec2.model.DescribeInstancesRequest;
@@ -44,7 +48,6 @@ public class AWS {
     private final S3Client s3;
     private final SqsClient sqs;
     private final Ec2Client ec2;
-
     public static String ami = "ami-00e95a9222311e8ed";
 
     public static Region region1 = Region.US_WEST_2;
@@ -54,9 +57,11 @@ public class AWS {
 
     // Constructor initializes S3, SQS, and EC2 clients with the default region.
     private AWS() {
-        s3 = S3Client.builder().region(region1).build();
-        sqs = SqsClient.builder().region(region1).build();
-        ec2 = Ec2Client.builder().region(region1).build();
+        String[] credentials = aws_credentials_loader();
+        AwsBasicCredentials awsCreds = AwsBasicCredentials.create(credentials[0], credentials[1]);
+        s3 = S3Client.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
+        sqs = SqsClient.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
+        ec2 = Ec2Client.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
     }
 
     /**
@@ -389,4 +394,27 @@ public String uploadJar(String filePath, String bucketName) {
         return script;
     }
 
+    private static String[] aws_credentials_loader() {
+        // Specify the file path
+        String credentialsFilePath = "aws_credinatials.txt";
+
+        // Load the properties file
+         // Initialize variables to store credentials
+        String[] creds = new String[2];
+
+        // Read the file line by line
+        try (BufferedReader reader = new BufferedReader(new FileReader(credentialsFilePath))) {
+            String line;
+            int i = 0;
+            while ((line = reader.readLine()) != null) {
+                // Split each line at the '=' character
+                String[] parts = line.split("=", 2);
+                creds[i] = parts[1];
+                i++;
+            }
+        } catch (IOException e) {
+            System.err.println("Error reading credentials file: " + e.getMessage());
+        }
+        return creds;
+    }
 }
