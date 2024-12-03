@@ -1,10 +1,12 @@
 package com.example;
 
+import java.io.File;
+
 public class LocalApplication{
     private static String MANAGER_JAR = "";
     private static String WORKER_JAR = "";
     private static String EC2_BUCKET = "Jar_Bucket";
-    private static String CLIENT_BUCKET = "Text_File_Bucket";
+    private static String FILES_BUCKET = "Text_File_Bucket";
     static String SQS_CLIENT = "LocalApp_To_Manager";
     static String SQS_READY = "Manager_To_LocalApp";
 
@@ -12,17 +14,18 @@ public class LocalApplication{
     static String dilimeter = " ";
 
     // Method to process the file
-    public static void processFile(String inputFilePath, String outputFilePath) {
-        HTMLConverter htmlConverter = new HTMLConverter(inputFilePath, outputFilePath);
+    public static void processFile(String input_file_path, String output_file_path) {
+        HTMLConverter htmlConverter = new HTMLConverter(input_file_path, output_file_path);
         htmlConverter.convertToHTML();
-        System.out.println("Successfully Converted the input file, you can find the outcome at : " + outputFilePath);
+        File summery_file = new File(input_file_path);
+        summery_file.delete();
+        System.out.println("Successfully Converted the input file, you can find the outcome at : " + output_file_path);
     }
 
     public static String listenToSQS(String filePath, AWS awsTool, String queueName){
         String summaryFileName = "FileNotFound";
         while (summaryFileName.contentEquals("FileNotFound")) {
             summaryFileName = awsTool.checkSQSQueue(queueName, filePath);
-            //move key to file location
             try {
                 Thread.sleep(5000); // Wait for 5 second before retrying
             } catch (InterruptedException e) {
@@ -33,10 +36,10 @@ public class LocalApplication{
     }
 
     public static void setupAWS(){
-        aws.createBucketIfNotExists(CLIENT_BUCKET);
+        aws.createBucketIfNotExists(FILES_BUCKET);
         aws.createSqsQueue(SQS_CLIENT);
     }
-    //TODO::initalizeManager; formalte the script to run on the ec2 machine
+    
     public static void initalizeManager(){
         if(aws.isManagerInstanceRunning()){
             return;
@@ -50,29 +53,31 @@ public class LocalApplication{
     }
 
     //TODO:: terminateManager: should we wait for an update message from the manager on successfull termination?
-    public static void terminateManager() {
+    public static void terminateManager(AWS aws) {
         aws.sendSQSMessage("terminate", SQS_CLIENT);
-        //maybe we want to confirm with the manager that he teminated succesfully?
-        System.out.println("Manager shut down successfully");   
+        if(listenToSQS("terminate", aws, SQS_READY).contentEquals("terminate")){
+            System.out.println("Manager shut down successfully");
+            System.exit(0);
+        }
     }
 
     public static void main(String[] args) {
         if (args.length < 3) {
-            System.out.println("No args: LocalApplication <inputFileName> <outputFileName> <n> [--terminate]");
+            System.out.println("Not all args delivered: LocalApplication <input file path> <output file path> <n> [terminate]");
             return;
         }
 
-        String inputFileName = args[0];
-        String outputFileName = args[1];
+        String input_file_path = args[0];
+        String output_file_path = args[1];
         int n = Integer.parseInt(args[2]);
         boolean terminate = args.length > 3 && args[3].equals("terminate");
         if(!terminate){
             setupAWS();
-            String filePathS3 = aws.uploadFileToS3(inputFileName, CLIENT_BUCKET);
+            String file_key_S3 = aws.uploadFileToS3(input_file_path, FILES_BUCKET);
             int tries = 0;
-            while(filePathS3 == null &&  tries < 5){
+            while(file_key_S3 == null &&  tries < 5){
                 //retry or shut down and update user.
-                filePathS3 = aws.uploadFileToS3(inputFileName, CLIENT_BUCKET);
+                file_key_S3 = aws.uploadFileToS3(input_file_path, FILES_BUCKET);
                 tries++;
             }
             if(tries == 5){
@@ -80,17 +85,23 @@ public class LocalApplication{
                 System.exit(0);
             }
             //message format - <file_location_s3>:::<lines_per_worker>
-            String msg = filePathS3 + dilimeter + n;
+            String msg = file_key_S3 + dilimeter + n;
             aws.sendSQSMessage(msg, SQS_CLIENT);
             initalizeManager();
-            filePathS3 = listenToSQS(filePathS3, aws, SQS_READY);
-
-            if(aws.downloadFileFromS3(CLIENT_BUCKET, filePathS3, outputFileName + ".txt")){
-                processFile(outputFileName + ".txt", outputFileName + ".html");
+            file_key_S3 = listenToSQS(file_key_S3, aws, SQS_READY);
+            if(file_key_S3.contentEquals("terminate")){
+                System.out.println("Server is shutting down, please try gain later...");
+                System.exit(0);
+            }
+            if(aws.downloadFileFromS3(FILES_BUCKET, file_key_S3, output_file_path + ".txt")){
+                processFile(output_file_path + ".txt", output_file_path + ".html");
+            }
+            else{
+                System.out.println("couldn't Download the file from the server....");
             }
         }
         else {
-            terminateManager();
+            terminateManager(aws);
         }
     }
 }

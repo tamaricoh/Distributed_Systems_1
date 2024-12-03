@@ -271,8 +271,11 @@ public class AWS {
      * @return The key of the uploaded file in S3, or null if the upload fails.
      * @throws IOException If an I/O error occurs.
      */
-    public String uploadFileToS3(String inputFileName, String bucketName) {
-        String s3Key = Paths.get(inputFileName).getFileName().toString();
+    public String uploadFileToS3(String input_file_path, String bucketName) {
+        String s3Key = Paths.get(input_file_path).getFileName().toString();
+        if (s3Key.contentEquals("terminate") || s3Key.contentEquals("FileNoTFound")){
+            return null;
+        }
 
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
@@ -280,7 +283,7 @@ public class AWS {
                     .key(s3Key)
                     .build();
 
-            Path path = Paths.get(inputFileName);
+            Path path = Paths.get(input_file_path);
             getInstance().s3.putObject(putObjectRequest, path);
             System.out.println("File uploaded successfully to S3: " + s3Key);
             return s3Key;
