@@ -228,7 +228,7 @@ public class AWS {
      * @param inputfile Name of the uploaded file.
      * @return the processed file key in s3 as a String, or "FileNotFound" if no matching message is found.
      */
-    public String checkSQSQueue(String queueName, String inputfile) {
+    public String checkSQSQueue(String queueName, String input_file_name) {
         try {
             // Retrieve the queue URL
             GetQueueUrlRequest getQueueUrlRequest = GetQueueUrlRequest.builder()
@@ -250,7 +250,7 @@ public class AWS {
             for (var message : receiveMessageResponse.messages()) {
                 String messageBody = message.body();
                 String[] parts = messageBody.split(" ");
-                if (parts[0].contentEquals(inputfile)) {
+                if (parts[0].contentEquals(input_file_name)) {
                     return parts[1];
                 }
                 else if (parts[0].contentEquals("terminate")){
