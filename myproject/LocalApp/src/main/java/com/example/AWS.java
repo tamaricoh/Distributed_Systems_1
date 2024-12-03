@@ -253,6 +253,9 @@ public class AWS {
                 if (parts[0].contentEquals(inputfile)) {
                     return parts[1];
                 }
+                else if (parts[0].contentEquals("terminate")){
+                    return "terminate";
+                }
             }
         } catch (SqsException e) {
             System.err.println("Error checking SQS queue: " + e.awsErrorDetails().errorMessage());
