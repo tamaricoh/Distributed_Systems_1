@@ -5,11 +5,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.List;
+import java.util.ArrayList;
 import java.io.BufferedReader;
-import java.io.FileInputStream;
+// import java.io.FileInputStream;
 import java.io.FileReader;
-import java.io.IOException;
-import java.util.Properties;
+// import java.io.IOException;
+// import java.util.Properties;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.CreateTagsRequest;
 import software.amazon.awssdk.services.ec2.model.DescribeInstancesRequest;
@@ -51,14 +52,15 @@ public class AWS {
     public static String ami = "ami-00e95a9222311e8ed";
 
     public static Region region1 = Region.US_WEST_2;
+    // public static Region region1 = Region.US_EAST_1;
     public static Region region2 = Region.US_EAST_1;
 
     private static final AWS instance = new AWS();
 
     // Constructor initializes S3, SQS, and EC2 clients with the default region.
     private AWS() {
-        String[] credentials = aws_credentials_loader();
-        AwsBasicCredentials awsCreds = AwsBasicCredentials.create(credentials[0], credentials[1]);
+        List<String> credentials = aws_credentials_loader();
+        AwsBasicCredentials awsCreds = AwsBasicCredentials.create(credentials.get(0), credentials.get(1));
         s3 = S3Client.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
         sqs = SqsClient.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
         ec2 = Ec2Client.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
@@ -383,38 +385,44 @@ public String uploadJar(String filePath, String bucketName) {
         return false; // File does not exist
     }
 
-    public String generateManagerUserDataScript(String bucketName, String jarFilePath, String queueName) {
+    public String generateManagerUserDataScript(String bucketName, String jarFilePath, String queueName, String workerJarPath) {
         String script = String.join("\n",
             "#!/bin/bash",
             "sudo yum update -y",
             "sudo yum install -y java-1.8.0-openjdk", // Install Java if needed
             "aws s3 cp s3://" + bucketName + "/" + Paths.get(jarFilePath).getFileName() + " /home/ec2-user/manager.jar",
+            "aws s3 cp s3://" + bucketName + "/" + Paths.get(workerJarPath).getFileName() + " /home/ec2-user/worker.jar",
             "java -jar /home/ec2-user/manager.jar " + queueName // Run the JAR with the queue name as an argument
         );
         return script;
     }
 
-    private static String[] aws_credentials_loader() {
+    private static List<String> aws_credentials_loader() {
         // Specify the file path
-        String credentialsFilePath = "aws_credinatials.txt";
+        String credentialsFilePath = "C:\\Users\\tamar\\.aws\\credentials";
 
-        // Load the properties file
-         // Initialize variables to store credentials
-        String[] creds = new String[2];
+        // List to store credentials
+        List<String> creds = new ArrayList<>();
 
         // Read the file line by line
         try (BufferedReader reader = new BufferedReader(new FileReader(credentialsFilePath))) {
             String line;
-            int i = 0;
             while ((line = reader.readLine()) != null) {
                 // Split each line at the '=' character
                 String[] parts = line.split("=", 2);
-                creds[i] = parts[1];
-                i++;
+                if (parts.length == 2) {
+                    creds.add(parts[1].trim());  // Add the value part of the key-value pair
+                }
             }
+
+            if (creds.size() < 3) {
+                System.err.println("Error: Not enough credentials found in the file.");
+            }
+
         } catch (IOException e) {
             System.err.println("Error reading credentials file: " + e.getMessage());
         }
         return creds;
     }
+
 }
