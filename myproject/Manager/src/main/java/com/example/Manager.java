@@ -2,6 +2,7 @@ package com.example;
 
 import java.util.Queue;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -12,9 +13,10 @@ import java.util.concurrent.Semaphore;
 
 public class Manager {
 
+    public final int MAX_WORKERS = 14;
     private static final int THREAD_POOL_SIZE = 5;
-    private ExecutorService threadPool;
-    public AtomicInteger availableWorkers = new AtomicInteger(14);
+    public ExecutorService threadPool;
+    public AtomicInteger availableWorkers = new AtomicInteger(MAX_WORKERS);
     private final Queue<String> userQueue = new LinkedList<>();
     private final Semaphore machineSem = new Semaphore(1);
 
@@ -87,13 +89,27 @@ public class Manager {
         }
     }
 
-    // Method to get the number of active users in the queue
-    public int getActiveUsersCount() throws InterruptedException {
-        machineSem.acquire(); // Acquire the lock to check the size
+    /**
+    * Method to get a copy of the active users queue.
+    * This method returns a copy of the linked list containing the active users.
+    * 
+    * @return A copy of the linked list representing the active users in the queue.
+    * @throws InterruptedException If the thread is interrupted while waiting for the lock.
+    */
+    public LinkedList<String> getActiveUsersCopy() throws InterruptedException {
+        machineSem.acquire(); // Acquire the lock to access the queue
         try {
-            return userQueue.size();  // Return the size of the queue (active users)
+            // Return a new copy of the linked list to avoid exposing the internal structure
+            return new LinkedList<>(userQueue);
         } finally {
             machineSem.release(); // Release the lock after the operation
         }
+    }
+
+    public int getThreadCount(){
+        if (threadPool instanceof java.util.concurrent.ThreadPoolExecutor) {
+            return ((java.util.concurrent.ThreadPoolExecutor) threadPool).getActiveCount();
+        }
+        return 5;
     }
 }

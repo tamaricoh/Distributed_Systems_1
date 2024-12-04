@@ -1,30 +1,26 @@
 package com.example;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Base64;
-// import java.util.List;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.CreateTagsRequest;
-import software.amazon.awssdk.services.ec2.model.DescribeInstancesRequest;
-import software.amazon.awssdk.services.ec2.model.DescribeInstancesResponse;
 import software.amazon.awssdk.services.ec2.model.Ec2Exception;
 import software.amazon.awssdk.services.ec2.model.IamInstanceProfileSpecification;
-import software.amazon.awssdk.services.ec2.model.Instance;
-import software.amazon.awssdk.services.ec2.model.InstanceStateName;
-// import software.amazon.awssdk.services.ec2.model.Instance;
 import software.amazon.awssdk.services.ec2.model.InstanceType;
-import software.amazon.awssdk.services.ec2.model.Reservation;
 import software.amazon.awssdk.services.ec2.model.RunInstancesRequest;
 import software.amazon.awssdk.services.ec2.model.RunInstancesResponse;
 import software.amazon.awssdk.services.ec2.model.Tag;
+import software.amazon.awssdk.services.ec2.model.TerminateInstancesRequest;
+import software.amazon.awssdk.services.ec2.model.TerminateInstancesResponse;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.BucketLocationConstraint;
 import software.amazon.awssdk.services.s3.model.CreateBucketConfiguration;
@@ -65,7 +61,7 @@ public class AWSManeger {
     private AWSManeger() {
         s3Client = S3Client.builder().region(region1).build();
         sqsClient = SqsClient.builder().region(region1).build();
-        ec2Client = Ec2Client.builder().region(region1).build();
+        ec2Client = Ec2Client.builder().region(region2).build();
     }
 
     /**
@@ -403,6 +399,43 @@ public class AWSManeger {
         } catch (Exception e) {
             // Catch any exceptions that occur during the delete process and print the error message
             System.err.println("Error deleting bucket: " + e.getMessage());
+        }
+    }
+
+    public void shutdown() {
+        String instanceId = getInstanceId();
+        try {
+            // Create a termination request
+            TerminateInstancesRequest terminateRequest = TerminateInstancesRequest.builder()
+                .instanceIds(instanceId)
+                .build();
+
+            // Execute the termination
+            TerminateInstancesResponse response = ec2Client.terminateInstances(terminateRequest);
+            response.terminatingInstances().forEach(instance -> 
+                System.out.println("Instance " + instance.instanceId() + " is now " + instance.currentState().name())
+            );
+        } catch (Exception e) {
+            System.err.println("Failed to terminate instance: " + e.getMessage());
+        }
+    }
+
+    public static String getInstanceId() {
+        try {
+            URL url = new URL("http://169.254.169.254/latest/meta-data/instance-id");
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode == 200) {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+                    return reader.readLine();
+                }
+            } else {
+                throw new RuntimeException("Failed to fetch instance ID. HTTP response code: " + responseCode);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Error fetching instance ID: " + e.getMessage(), e);
         }
     }
 

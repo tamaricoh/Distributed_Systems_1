@@ -4,15 +4,14 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-// import java.util.UUID;
-
-// import com.ibm.j9ddr.vm29.structure.stat;
+import java.util.LinkedList;
 
 public class ManagerLocalRun implements Runnable {
 
     private static final String LOCALAPP_TO_MANAGER_QUEUE_NAME = "localapp-to-manager";
     private static final String MANAGER_TO_WORKERS_QUEUE_NAME = "manager-to-workers";
     private static final String WORKERS_TO_MANAGER_QUEUE_NAME = "worker-to-manager";
+    private static String SQS_READY = "manager-to-localapp";
     // private static final String LOCALAPP_TO_MANAGER_BUCKET_NAME = "LocalApp-To-Manager";
     private static String CLIENT_BUCKET = "text-file-bucket";
     private static String EC2_BUCKET = "jar-bucket";
@@ -140,9 +139,35 @@ public class ManagerLocalRun implements Runnable {
         }
     }
 
-
-    private void terminate(){
-        terminate = true; 
+    private LinkedList<String> getClients(){
+        Boolean fetched = false;
+        LinkedList<String> clients = null;
+        while(!fetched){
+            try {
+                clients = manager.getActiveUsersCopy();
+                fetched = true;  
+            } catch (Exception e) {
+                fetched = false;
+            }
+        }
+        return clients;
     }
 
+    private void terminate(){
+        terminate = true;
+        LinkedList<String> clients = getClients();
+        for (String client : clients) {
+            aws.sendSQSMessage("terminate", WORKERS_TO_MANAGER_QUEUE_NAME + client);
+            aws.sendSQSMessage("terminate", SQS_READY); 
+        }
+        aws.deleteBucket(CLIENT_BUCKET);
+        aws.deleteQueue(LOCALAPP_TO_MANAGER_QUEUE_NAME);
+        while(manager.availableWorkers.get() < manager.MAX_WORKERS || manager.getThreadCount() > 0){
+            try {
+                Thread.sleep(5000);
+            } catch (Exception e) {
+            }
+        }
+        aws.shutdown();
+    }
 }

@@ -5,14 +5,12 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.spi.LocaleNameProvider;
 
 public class ManagerWorkerRun implements Runnable {
 
     private static final String WORKERS_TO_MANAGER_QUEUE_NAME = "workers-to-manager";
     private static final String MANAGER_TO_LOCALAPP_QUEUE_NAME = "manager-to-localapp";
     private static final String MANAGER_TO_WORKERS_QUEUE = "manager_to_workers";
-    // private static final String WORKERS_TO_MANAGER_BUCKET_NAME = "Workers-To-Manager";
     private static String CLIENT_BUCKET = "text-file-bucket";
 
     static AWSManeger aws = AWSManeger.getInstance();
@@ -62,6 +60,19 @@ public class ManagerWorkerRun implements Runnable {
                         System.err.println("Error uploading file to S3.");
                     }
                 }
+            }
+        }
+        String fileName = createSummaryFile();
+        if (fileName != null) {
+            String s3Key = aws.uploadFileToS3(fileName, CLIENT_BUCKET);
+            if (s3Key != null) {
+                System.out.println("File successfully uploaded to S3. S3 Key: " + s3Key);
+                aws.sendSQSMessage(localAppID + " " + s3Key, MANAGER_TO_LOCALAPP_QUEUE_NAME);
+                terminateWorkers();
+                deleteReasources(false);
+                removeClient();
+            } else {
+                System.err.println("Error uploading file to S3.");
             }
         }
             System.out.println("All tasks processed. Total messages: " + numOfCompletedTasks);
