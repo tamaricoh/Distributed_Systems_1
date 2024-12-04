@@ -48,15 +48,21 @@ public class ManagerLocalRun implements Runnable {
             if (path != null) {
                 int numOfTasks = readFile(path, linesPerWorker, LocalAppID);
                 if (numOfTasks != -1){
-                    bootstrap(numOfTasks/linesPerWorker, LocalAppID);
-                    ManagerWorkerRun workerTask = new ManagerWorkerRun(linesPerWorker, numOfTasks, LocalAppID);
-                    manager.submitTask(workerTask);
+                    int active_workers = bootstrap(numOfTasks/linesPerWorker, LocalAppID);
+                    if (active_workers > 0){
+                        ManagerWorkerRun workerTask = new ManagerWorkerRun(active_workers, numOfTasks, LocalAppID, manager);
+                        addClient(LocalAppID);
+                        manager.submitTask(workerTask);
+                    }
+                    else{
+                        aws.sendSQSMessage(s3Location + " " + linesPerWorker, LOCALAPP_TO_MANAGER_QUEUE_NAME);
+                    }
                 }
             }
         }
     }
 
-    private String createSQSMessage(String operation, String url) {
+    private String parseMessage(String operation, String url) {
         return operation + " " + url;
     }
 
@@ -67,8 +73,8 @@ public class ManagerLocalRun implements Runnable {
      * @param linesPerWorker The number of lines to be processed by each worker.
      */
     private int readFile(Path filePath, int linesPerWorker, String LocalAppID) {
-        aws.createSqsQueue(MANAGER_TO_WORKERS_QUEUE_NAME+"_"+LocalAppID);
-        aws.createSqsQueue(WORKERS_TO_MANAGER_QUEUE_NAME+"_"+LocalAppID);
+        aws.createSqsQueue(MANAGER_TO_WORKERS_QUEUE_NAME + LocalAppID);
+        aws.createSqsQueue(WORKERS_TO_MANAGER_QUEUE_NAME + LocalAppID);
         int numOfTasks = 0;
         try (BufferedReader reader = Files.newBufferedReader(filePath)) {
             String line;
@@ -81,10 +87,10 @@ public class ManagerLocalRun implements Runnable {
 
                 String operation = parts[0];
                 String url = parts[1];
-                String message = createSQSMessage(operation, url);
+                String message = parseMessage(operation, url);
 
                 // Send the message to the SQS queue
-                aws.sendSQSMessage(message, MANAGER_TO_WORKERS_QUEUE_NAME + "_" + LocalAppID);
+                aws.sendSQSMessage(message, MANAGER_TO_WORKERS_QUEUE_NAME + LocalAppID);
                 numOfTasks++;
             }
             return numOfTasks;
@@ -97,16 +103,16 @@ public class ManagerLocalRun implements Runnable {
     /**
      * Placeholder for the bootstrap function.
      * 
-     * @param linesPerWorker Number of lines each worker should process.
-     * @param numOfTasks     Total number of tasks generated.
+     * @param numOfWorkers Number of worker instances to boot.
+     * @param LocalAppID     client identification for creating unique queues and buckets.
      */
     private int bootstrap(int numOfWorkers, String LocalAppID) {
-        aws.createBucketIfNotExists("user_LA_"+LocalAppID);
+        aws.createBucketIfNotExists("la-"+LocalAppID);
         
         if (manager.getAvailableWorkers() > 0 && numOfWorkers > 0){
             numOfWorkers = Math.min(numOfWorkers, manager.getAvailableWorkers());
             manager.availableWorkers.addAndGet(-numOfWorkers);
-            initializeWorker("user_LA_"+LocalAppID, "Worker_"+LocalAppID, numOfWorkers, LocalAppID);
+            initializeWorker("la-"+LocalAppID, "worker-"+LocalAppID, numOfWorkers, LocalAppID);
          }
          else {
             return 0;
@@ -121,7 +127,22 @@ public class ManagerLocalRun implements Runnable {
         aws.createEC2(workerDataScript, tag, num);
     }
 
+    //problemitic approach
+    private void addClient(String ID){
+        Boolean added = false;
+        while(!added){
+            try {
+                manager.addUser(ID);
+                added = true;  
+            } catch (Exception e) {
+                added = false;
+            }
+        }
+    }
+
+
     private void terminate(){
         terminate = true; 
     }
+
 }

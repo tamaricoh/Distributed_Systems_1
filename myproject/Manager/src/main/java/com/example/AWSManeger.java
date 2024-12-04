@@ -41,7 +41,7 @@ import software.amazon.awssdk.services.sqs.model.SqsException;
 public class AWSManeger {
     private final S3Client s3Client;
     private final SqsClient sqsClient;
-
+    private int WorkerVisibilityTimeout = 10;
     public static String ami = "ami-00e95a9222311e8ed";
 
     public static Region region1 = Region.US_WEST_2;
@@ -80,6 +80,7 @@ public class AWSManeger {
                     .queueUrl(getQueueUrl(QUEUE_NAME))
                     .maxNumberOfMessages(1) // Process one message at a time
                     .waitTimeSeconds(10) // Long polling
+                    .visibilityTimeout(WorkerVisibilityTimeout)
                     .build();
 
             // Receive messages from the queue
