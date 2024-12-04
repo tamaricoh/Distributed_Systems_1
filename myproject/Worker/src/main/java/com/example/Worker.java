@@ -3,42 +3,55 @@ package com.example;
 import java.io.*;
 // import java.net.*;
 
+import software.amazon.awssdk.services.sqs.model.Message;
+
 
 public class Worker{
 
-    private static final String MANAGER_TO_WORKERS_QUEUE_NAME = "Manager_To_Workers";
-    private static final String WORKERS_TO_MANAGER_BUCKET_NAME = "Workers_To_Manager";
+    private static final String MANAGER_TO_WORKERS_QUEUE = "manager_to_workers";
+    private static final String CLIENT_BUCKET = "workers_to_manager";
+    private static final String WORKERS_TO_MANAGER_QUEUE = "workers_to_manager";
 
     // String linesPerWorker = System.getenv("LINES_PER_WORKER");
     String localAppID = System.getenv("LOCAL_APP_ID");
 
 
     static AWS aws = AWS.getInstance();
-    private Boolean terminate;
+    public Boolean terminate;
 
     // Constructor
     public Worker() {
         this.terminate = false;
     }
 
+    private String getName(String bucketName){
+        return bucketName + localAppID;
+    }
+
     // @Override
     public void startWorker() {
-        while(!terminate){
-            String msg = aws.getMessage(MANAGER_TO_WORKERS_QUEUE_NAME, localAppID);
-            if (msg != ""){
+        while(!this.terminate){
+            Message msg = aws.getMessage(getName(MANAGER_TO_WORKERS_QUEUE));
+            if (msg != null){
                 try{
-                    if (msg.equals("terminate")) {
+                    String task = msg.body();
+                    if (task.contentEquals("terminate")) {
                         terminate = true;  // Set terminate flag to true to break the loop
                         System.out.println("Received termination message. Shutting down worker.");
                         break;  // Exit the loop and terminate the worker thread
                     }
-                    String[] parts = msg.split(" ");
+                    String[] parts = task.split(" ");
                     String operation = parts[0]; // Extract operation
                     String url = parts[1];      // Extract URL
+
                     String newURL = processFile(operation, url);
-                    aws.uploadFileToS3(url, newURL, operation, WORKERS_TO_MANAGER_BUCKET_NAME, localAppID);
-                    // should send update masseage to workermanager
-                    // should handle termination message
+                    if (!newURL.contains("Error:")){
+                        newURL = aws.uploadFileToS3(newURL, getName(CLIENT_BUCKET));
+                        File file = new File(newURL);
+                        if (file.exists()) file.delete();
+                    }
+                    aws.sendMessage(getName(WORKERS_TO_MANAGER_QUEUE), operation + " " + url + " " + newURL);
+                    aws.deleteMessage(getName(MANAGER_TO_WORKERS_QUEUE), msg.receiptHandle());
                 } catch (Exception e) {
                     System.err.println("Error while processing the task: " + e.getMessage());  
                 }
@@ -54,11 +67,13 @@ public class Worker{
      * @throws IOException If an error occurs during file processing.
      */
     private String processFile(String operation, String url) throws IOException {
-        return PDFConverter.convertFromUrl(url, operation);
+        return PDFConverter.convertFromUrl(url, operation, localAppID);
     }
 
     public static void main(String[] args){
         Worker worker = new Worker();
         worker.startWorker();
+        aws.shutdown();
+        //shut down the EC2 instance()
     }
 }

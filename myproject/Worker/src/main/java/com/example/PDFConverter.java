@@ -3,7 +3,6 @@ package com.example;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
-
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -14,7 +13,7 @@ import java.io.Writer;
 import java.io.FileWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
-//TODO:: move pdf convertor to cloud.
+
 public class PDFConverter {
 
     public static void convertToImage(String pdfPath, String outputImagePath) throws IOException {
@@ -51,21 +50,21 @@ public class PDFConverter {
         }
     }
 
-    public static String convertFromUrl(String url, String operation) throws IOException {
-        // Define the destination where the file will be saved locally
-        String destinationFile = "downloaded_file.pdf";  // Modify this as needed
-        
+    public static String convertFromUrl(String url, String operation, String localAppID) throws IOException {
+        // Generate a destination file name based on URL and localAppID
+        String destinationFile = generateFileName(url, localAppID);
+    
         // First, download the file
         String downloadResult = downloadFile(url, destinationFile);
         if (downloadResult != null) {
             // If the download fails, return the error message
             return downloadResult;
         }
-
+    
         // Proceed with the conversion after downloading the file
         String baseFileName = destinationFile.replace(".pdf", "");
         String outputPath;
-
+    
         try {
             switch (operation.toUpperCase()) {
                 case "TOIMAGE":
@@ -83,14 +82,29 @@ public class PDFConverter {
                 default:
                     throw new IllegalArgumentException("Unsupported operation: " + operation);
             }
-
+    
             // Return the URL of the output file (successful case)
             return new File(outputPath).toURI().toString();
-
+    
         } catch (IOException e) {
             // Return an error message if conversion fails
             return "Error: Unable to convert PDF to " + operation + ". Reason: " + e.getMessage();
         }
+    }
+    
+    /**
+     * Generates a file name using the base name of the URL and localAppID.
+     *
+     * @param url       The URL of the file to be downloaded.
+     * @param localAppID A unique identifier for the application.
+     * @return A string representing the generated file name.
+     */
+    private static String generateFileName(String url, String localAppID) {
+        String baseName = new File(url).getName(); // Extract the file name from URL
+        if (!baseName.endsWith(".pdf")) {
+            baseName += ".pdf"; // Ensure the extension is .pdf
+        }
+        return baseName.replace(".pdf", "_" + localAppID + ".pdf");
     }
 
     // Download function which returns a string indicating the result
@@ -98,7 +112,6 @@ public class PDFConverter {
         // Check if the file exists and delete it if needed
         File file = new File(destinationFile);
         if (file.exists()) {
-            System.out.println("File already exists, it will be overwritten.");
             file.delete();
         }
 
