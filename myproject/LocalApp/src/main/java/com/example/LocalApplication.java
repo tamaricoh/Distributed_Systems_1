@@ -3,10 +3,10 @@ package com.example;
 import java.io.File;
 
 public class LocalApplication{
-    private static String MANAGER_JAR = "../../../Manager/target/Manager-1.0-SNAPSHOT.jar";
+    private static String MANAGER_JAR = "Manager-1.0-SNAPSHOT.jar";
     private static String WORKER_JAR = "../../../Worker/target/Worker-1.0-SNAPSHOT.jar";
-    private static String EC2_BUCKET = "jar-bucket";
-    private static String FILES_BUCKET = "text-file-bucket";
+    private static String EC2_BUCKET = "jar-bucket-101";
+    private static String FILES_BUCKET = "text-file-bucket-101";
     static String SQS_CLIENT = "localapp-to-manager";
     static String SQS_READY = "manager-to-localapp";
 
@@ -48,8 +48,10 @@ public class LocalApplication{
         String manager_path_s3 = aws.uploadJar(MANAGER_JAR, EC2_BUCKET);
         // aws.uploadJar(WORKER_JAR, EC2_BUCKET);
         String workerJarPath = aws.uploadJar(WORKER_JAR, EC2_BUCKET);
-        String userDataScript = aws.generateManagerUserDataScript(EC2_BUCKET, manager_path_s3, SQS_CLIENT, workerJarPath);
-        aws.createEC2(userDataScript, "Manager", 1);
+        if (manager_path_s3 != "" && workerJarPath != ""){
+            String userDataScript = aws.generateManagerUserDataScript(EC2_BUCKET, manager_path_s3, SQS_CLIENT, workerJarPath);
+            aws.createEC2(userDataScript, "Manager", 1);
+        }
     }
 
     //TODO:: terminateManager: should we wait for an update message from the manager on successfull termination?
