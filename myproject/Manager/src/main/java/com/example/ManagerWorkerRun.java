@@ -5,12 +5,13 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDate;
+import java.util.spi.LocaleNameProvider;
 
 public class ManagerWorkerRun implements Runnable {
 
     private static final String WORKERS_TO_MANAGER_QUEUE_NAME = "workers-to-manager";
     private static final String MANAGER_TO_LOCALAPP_QUEUE_NAME = "manager-to-localapp";
+    private static final String MANAGER_TO_WORKERS_QUEUE = "manager_to_workers";
     // private static final String WORKERS_TO_MANAGER_BUCKET_NAME = "Workers-To-Manager";
     private static String CLIENT_BUCKET = "text-file-bucket";
 
@@ -46,7 +47,6 @@ public class ManagerWorkerRun implements Runnable {
             else if(msg.length == 1 & msg[0].contentEquals("terminate")) {
                 terminateWorkers();
                 deleteReasources(true);
-                removeClient();
             }
             if (numOfCompletedTasks == numOfTasks) {
                 String fileName = createSummaryFile();
@@ -68,29 +68,33 @@ public class ManagerWorkerRun implements Runnable {
     }
         
     private void terminateWorkers() {
-        //empty the queue
-        //send termination masseges to workers
-        //wait until queue is empty
-        //return
-        
-
-
-
-
+        //send termination message to workers
+        for(int i =0; i<active_workers ; i++){
+            aws.sendSQSMessage("terminate", MANAGER_TO_WORKERS_QUEUE + localAppID);
+        }
+        int instances = active_workers;
+        //wait for all workers to shut down
+        while(active_workers>0){
+            String[] msg = aws.getMessage(WORKERS_TO_MANAGER_QUEUE_NAME + localAppID);
+            if(msg != null & msg[0].contentEquals("terminating")){
+                active_workers--;
+            }
+            else{
+                continue;
+            }
+        }
+        //update avilable workers
+        this.manager.availableWorkers.addAndGet(instances);
         terminate = true;
-        
     }
 
     private void deleteReasources(Boolean delete_bucket) {
-        //delete both queues
-        //optinal delete bucket...
-        
-
-
-
-
-        terminate = true;
-        
+        aws.deleteQueue(MANAGER_TO_WORKERS_QUEUE + localAppID);
+        aws.deleteQueue(WORKERS_TO_MANAGER_QUEUE_NAME + localAppID);
+        if(delete_bucket){
+            aws.deleteBucket("la-" + localAppID);
+        }
+        terminate = true;   
     }
 
     private void removeClient(){
