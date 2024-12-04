@@ -61,9 +61,12 @@ public class AWS {
     private AWS() {
         List<String> credentials = aws_credentials_loader();
         AwsBasicCredentials awsCreds = AwsBasicCredentials.create(credentials.get(0), credentials.get(1));
-        s3 = S3Client.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
-        sqs = SqsClient.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
-        ec2 = Ec2Client.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
+        // s3 = S3Client.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
+        // sqs = SqsClient.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
+        // ec2 = Ec2Client.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
+        s3 = S3Client.builder().region(region1).build();
+        sqs = SqsClient.builder().region(region1).build();
+        ec2 =  Ec2Client.builder().region(region1).build();
     }
 
     /**
@@ -351,8 +354,14 @@ public String uploadJar(String filePath, String bucketName) {
         } else {
             // If the file does not exist, upload it
             String fileKey = uploadFileToS3(filePath, bucketName);
-            System.out.println("File successfully uploaded to the bucket: " + fileName);
-            return "s3://" + bucketName + "/" + fileKey;
+            if (fileKey != null) {
+                System.out.println("File successfully uploaded to the bucket: " + fileName);
+                return "s3://" + bucketName + "/" + fileKey;
+            }
+            else {
+                System.out.println("Unexpected error during file upload: " + fileName);
+                return "";
+            }
         }
 
         // Return the S3 path if the file already exists
