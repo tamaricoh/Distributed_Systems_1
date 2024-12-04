@@ -4,16 +4,24 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Base64;
 // import java.util.List;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.CreateTagsRequest;
+import software.amazon.awssdk.services.ec2.model.DescribeInstancesRequest;
+import software.amazon.awssdk.services.ec2.model.DescribeInstancesResponse;
 import software.amazon.awssdk.services.ec2.model.Ec2Exception;
 import software.amazon.awssdk.services.ec2.model.IamInstanceProfileSpecification;
+import software.amazon.awssdk.services.ec2.model.Instance;
+import software.amazon.awssdk.services.ec2.model.InstanceStateName;
 // import software.amazon.awssdk.services.ec2.model.Instance;
 import software.amazon.awssdk.services.ec2.model.InstanceType;
+import software.amazon.awssdk.services.ec2.model.Reservation;
 import software.amazon.awssdk.services.ec2.model.RunInstancesRequest;
 import software.amazon.awssdk.services.ec2.model.RunInstancesResponse;
 import software.amazon.awssdk.services.ec2.model.Tag;
@@ -21,6 +29,8 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.BucketLocationConstraint;
 import software.amazon.awssdk.services.s3.model.CreateBucketConfiguration;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
+import software.amazon.awssdk.services.s3.model.DeleteBucketRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
@@ -31,6 +41,7 @@ import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.CreateQueueRequest;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
+import software.amazon.awssdk.services.sqs.model.DeleteQueueRequest;
 import software.amazon.awssdk.services.sqs.model.GetQueueUrlRequest;
 import software.amazon.awssdk.services.sqs.model.GetQueueUrlResponse;
 import software.amazon.awssdk.services.sqs.model.Message;
@@ -41,6 +52,7 @@ import software.amazon.awssdk.services.sqs.model.SqsException;
 public class AWSManeger {
     private final S3Client s3Client;
     private final SqsClient sqsClient;
+    private final Ec2Client ec2Client;
     private int WorkerVisibilityTimeout = 10;
     public static String ami = "ami-00e95a9222311e8ed";
 
@@ -53,6 +65,7 @@ public class AWSManeger {
     private AWSManeger() {
         s3Client = S3Client.builder().region(region1).build();
         sqsClient = SqsClient.builder().region(region1).build();
+        ec2Client = Ec2Client.builder().region(region1).build();
     }
 
     /**
@@ -334,4 +347,63 @@ public class AWSManeger {
                 .build();
         sqsClient.createQueue(createQueueRequest);
     }
+
+    /**
+     * Deletes an SQS queue given its name.
+     * This method retrieves the queue URL using the provided queue name and sends a delete request.
+     * 
+     * @param queueName The name of the SQS queue to delete.
+     */
+    public void deleteQueue(String queueName) {
+        try {
+            DeleteQueueRequest deleteQueueRequest = DeleteQueueRequest.builder()
+                .queueUrl(getQueueUrl(queueName))  // Set the URL of the queue to delete
+                .build();
+            sqsClient.deleteQueue(deleteQueueRequest);
+        } catch (Exception e) {
+            System.err.println("Error deleting queue: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Deletes an S3 bucket given its name.
+     * This method first checks if the bucket is empty, and if not, it attempts to delete all objects in the bucket before deleting the bucket itself.
+     * 
+     * @param bucketName The name of the S3 bucket to delete.
+     */
+    public void deleteBucket(String bucketName) {
+        try {
+            // Step 1: Check if the bucket exists and is empty
+            ListObjectsV2Request listObjectsRequest = ListObjectsV2Request.builder()
+                .bucket(bucketName)
+                .build();
+            
+            ListObjectsV2Response listObjectsResponse = s3Client.listObjectsV2(listObjectsRequest);
+
+            // Step 2: If the bucket is not empty, delete all objects in the bucket
+            if (!listObjectsResponse.contents().isEmpty()) {
+                for (S3Object object : listObjectsResponse.contents()) {
+                    DeleteObjectsRequest deleteObjectsRequest = DeleteObjectsRequest.builder()
+                        .bucket(bucketName)
+                        .delete(delete -> delete.objects(o -> o.key(object.key())))
+                        .build();
+                    s3Client.deleteObjects(deleteObjectsRequest);
+                    System.out.println("Deleted object: " + object.key());
+                }
+            }
+
+            // Step 3: Delete the bucket after its objects have been removed (or if it was already empty)
+            DeleteBucketRequest deleteBucketRequest = DeleteBucketRequest.builder()
+                .bucket(bucketName)
+                .build();
+            
+            s3Client.deleteBucket(deleteBucketRequest);
+            System.out.println("Bucket " + bucketName + " has been deleted successfully.");
+
+        } catch (Exception e) {
+            // Catch any exceptions that occur during the delete process and print the error message
+            System.err.println("Error deleting bucket: " + e.getMessage());
+        }
+    }
+
 }

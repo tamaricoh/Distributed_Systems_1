@@ -9,7 +9,7 @@ import software.amazon.awssdk.services.sqs.model.Message;
 public class Worker{
 
     private static final String MANAGER_TO_WORKERS_QUEUE = "manager_to_workers";
-    private static final String CLIENT_BUCKET = "workers_to_manager";
+    private static final String CLIENT_BUCKET = "la-";
     private static final String WORKERS_TO_MANAGER_QUEUE = "workers_to_manager";
 
     // String linesPerWorker = System.getenv("LINES_PER_WORKER");
@@ -37,8 +37,8 @@ public class Worker{
                     String task = msg.body();
                     if (task.contentEquals("terminate")) {
                         terminate = true;  // Set terminate flag to true to break the loop
-                        System.out.println("Received termination message. Shutting down worker.");
-                        break;  // Exit the loop and terminate the worker thread
+                        aws.sendMessage(getName(WORKERS_TO_MANAGER_QUEUE), "terminting");
+                        aws.shutdown();
                     }
                     String[] parts = task.split(" ");
                     String operation = parts[0]; // Extract operation
