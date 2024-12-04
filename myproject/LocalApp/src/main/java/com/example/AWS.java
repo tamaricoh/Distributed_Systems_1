@@ -159,11 +159,11 @@ public class AWS {
      * @return true if such an instance exists, false otherwise.
      */
     public boolean isManagerInstanceRunning() {
-        // try {
-        //         Thread.sleep(3000);
-        // } catch (InterruptedException e) {
-        //         e.printStackTrace();
-        // }
+        try {
+                Thread.sleep(6000);
+        } catch (InterruptedException e) {
+                e.printStackTrace();
+        }
         // Define a filter for the tag "Name=Manager"
         Filter tagFilter = Filter.builder()
                 .name("tag:Name")
@@ -451,33 +451,5 @@ public String uploadJar(String filePath, String bucketName) {
         );
         return script;
     }
-
-    // private static List<String> aws_credentials_loader() {
-    //     // Specify the file path
-    //     String credentialsFilePath = "C:\\Users\\tamar\\.aws\\credentials";
-
-    //     // List to store credentials
-    //     List<String> creds = new ArrayList<>();
-
-    //     // Read the file line by line
-    //     try (BufferedReader reader = new BufferedReader(new FileReader(credentialsFilePath))) {
-    //         String line;
-    //         while ((line = reader.readLine()) != null) {
-    //             // Split each line at the '=' character
-    //             String[] parts = line.split("=", 2);
-    //             if (parts.length == 2) {
-    //                 creds.add(parts[1].trim());  // Add the value part of the key-value pair
-    //             }
-    //         }
-
-    //         if (creds.size() < 3) {
-    //             System.err.println("Error: Not enough credentials found in the file.");
-    //         }
-
-    //     } catch (IOException e) {
-    //         System.err.println("Error reading credentials file: " + e.getMessage());
-    //     }
-    //     return creds;
-    // }
 
 }
