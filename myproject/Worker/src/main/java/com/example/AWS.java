@@ -1,20 +1,17 @@
 package com.example;
 
 import java.io.BufferedReader;
-import java.io.File;
-// import java.io.IOException;
-// import java.nio.file.Path;
-// import java.nio.file.Paths;
-// import java.util.Base64;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.net.URL;
+
 
 import software.amazon.awssdk.services.ec2.Ec2Client;
-import software.amazon.awssdk.services.ec2.model.StopInstancesRequest;
-import software.amazon.awssdk.services.ec2.model.StopInstancesResponse;
 import software.amazon.awssdk.services.ec2.model.TerminateInstancesRequest;
 import software.amazon.awssdk.services.ec2.model.TerminateInstancesResponse;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -36,10 +33,10 @@ public class AWS {
     private final S3Client s3Client;
     private final SqsClient sqsClient;
     private final Ec2Client ec2Client;
+    private static final String INSTANCE_METADATA_URL = "http://169.254.169.254/latest/meta-data/instance-id";
 
     public static String ami = "ami-00e95a9222311e8ed";
     private int WorkerVisibilityTimeout = 10;
-    private String dilimeter = " ";
 
     public static Region region1 = Region.US_WEST_2;
     public static Region region2 = Region.US_EAST_1;
@@ -200,8 +197,42 @@ public class AWS {
         }
     }
     //TODO::implement shutdown() which is supposed to shut off the ec2 machine....
-    public static void shutdown() {
-        
+    
+    public void shutdown() {
+        String instanceId = getInstanceId();
+        try {
+            // Create a termination request
+            TerminateInstancesRequest terminateRequest = TerminateInstancesRequest.builder()
+                .instanceIds(instanceId)
+                .build();
+
+            // Execute the termination
+            TerminateInstancesResponse response = ec2Client.terminateInstances(terminateRequest);
+            response.terminatingInstances().forEach(instance -> 
+                System.out.println("Instance " + instance.instanceId() + " is now " + instance.currentState().name())
+            );
+        } catch (Exception e) {
+            System.err.println("Failed to terminate instance: " + e.getMessage());
+        }
+    }
+
+    public static String getInstanceId() {
+        try {
+            URL url = new URL(INSTANCE_METADATA_URL);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode == 200) {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+                    return reader.readLine();
+                }
+            } else {
+                throw new RuntimeException("Failed to fetch instance ID. HTTP response code: " + responseCode);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Error fetching instance ID: " + e.getMessage(), e);
+        }
     }
 
 }
