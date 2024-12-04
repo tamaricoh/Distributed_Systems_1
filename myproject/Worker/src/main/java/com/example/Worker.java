@@ -47,6 +47,8 @@ public class Worker{
                     String newURL = processFile(operation, url);
                     if (!newURL.contains("Error:")){
                         newURL = aws.uploadFileToS3(newURL, getName(CLIENT_BUCKET));
+                        File file = new File(newURL);
+                        if (file.exists()) file.delete();
                     }
                     aws.sendMessage(getName(WORKERS_TO_MANAGER_QUEUE), operation + " " + url + " " + newURL);
                     aws.deleteMessage(getName(MANAGER_TO_WORKERS_QUEUE), msg.receiptHandle());
@@ -65,7 +67,7 @@ public class Worker{
      * @throws IOException If an error occurs during file processing.
      */
     private String processFile(String operation, String url) throws IOException {
-        return PDFConverter.convertFromUrl(url, operation);
+        return PDFConverter.convertFromUrl(url, operation, localAppID);
     }
 
     public static void main(String[] args){
