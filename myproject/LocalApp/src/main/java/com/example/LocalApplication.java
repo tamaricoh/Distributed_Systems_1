@@ -3,8 +3,8 @@ package com.example;
 import java.io.File;
 
 public class LocalApplication{
-    private static String MANAGER_JAR = "Manager-1.0-SNAPSHOT.jar";
-    private static String WORKER_JAR = "../../../Worker/target/Worker-1.0-SNAPSHOT.jar";
+    private static String MANAGER_JAR = "C:\\Users\\tamar\\Desktop\\B.Sc\\Semester G\\AWS\\Assignment_1\\myproject\\Manager\\target\\Manager-1.0-SNAPSHOT.jar";
+    private static String WORKER_JAR = "C:\\Users\\tamar\\Desktop\\B.Sc\\Semester G\\AWS\\Assignment_1\\myproject\\Worker\\target\\Worker-1.0-SNAPSHOT.jar";
     private static String EC2_BUCKET = "jar-bucket-101";
     private static String FILES_BUCKET = "text-file-bucket-101";
     static String SQS_CLIENT = "localapp-to-manager";
@@ -38,12 +38,16 @@ public class LocalApplication{
     public static void setupAWS(){
         aws.createBucketIfNotExists(FILES_BUCKET);
         aws.createSqsQueue(SQS_CLIENT);
+        aws.createSqsQueue(SQS_READY);
     }
     
     public static void initalizeManager(){
         if(aws.isManagerInstanceRunning()){
             return;
         }
+        // if(aws.getAllInstances()){
+        //     return;
+        // }
         aws.createBucketIfNotExists(EC2_BUCKET);
         String manager_path_s3 = aws.uploadJar(MANAGER_JAR, EC2_BUCKET);
         // aws.uploadJar(WORKER_JAR, EC2_BUCKET);

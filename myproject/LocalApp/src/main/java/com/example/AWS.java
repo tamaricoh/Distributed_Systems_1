@@ -5,10 +5,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.List;
-import java.util.ArrayList;
-import java.io.BufferedReader;
+// import java.util.ArrayList;
+// import java.io.BufferedReader;
 // import java.io.FileInputStream;
-import java.io.FileReader;
+// import java.io.FileReader;
 // import java.io.IOException;
 // import java.util.Properties;
 import software.amazon.awssdk.services.ec2.Ec2Client;
@@ -17,6 +17,8 @@ import software.amazon.awssdk.services.ec2.model.DescribeInstancesRequest;
 import software.amazon.awssdk.services.ec2.model.DescribeInstancesResponse;
 import software.amazon.awssdk.services.ec2.model.Ec2Exception;
 import software.amazon.awssdk.services.ec2.model.IamInstanceProfileSpecification;
+import software.amazon.awssdk.services.ec2.model.Instance;
+import software.amazon.awssdk.services.ec2.model.InstanceStateName;
 import software.amazon.awssdk.services.ec2.model.InstanceType;
 import software.amazon.awssdk.services.ec2.model.Reservation;
 import software.amazon.awssdk.services.ec2.model.RunInstancesRequest;
@@ -40,8 +42,8 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SqsException;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+// import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+// import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.model.Tag;
 import software.amazon.awssdk.services.ec2.model.Filter;
@@ -54,19 +56,20 @@ public class AWS {
     public static Region region1 = Region.US_WEST_2;
     // public static Region region1 = Region.US_EAST_1;
     public static Region region2 = Region.US_EAST_1;
+    // public static Region region2 = Region.US_WEST_2;
 
     private static final AWS instance = new AWS();
 
     // Constructor initializes S3, SQS, and EC2 clients with the default region.
     private AWS() {
-        List<String> credentials = aws_credentials_loader();
-        AwsBasicCredentials awsCreds = AwsBasicCredentials.create(credentials.get(0), credentials.get(1));
+        // List<String> credentials = aws_credentials_loader();
+        // AwsBasicCredentials awsCreds = AwsBasicCredentials.create(credentials.get(0), credentials.get(1));
         // s3 = S3Client.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
         // sqs = SqsClient.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
         // ec2 = Ec2Client.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
         s3 = S3Client.builder().region(region1).build();
         sqs = SqsClient.builder().region(region1).build();
-        ec2 =  Ec2Client.builder().region(region1).build();
+        ec2 =  Ec2Client.builder().region(region2).build();
     }
 
     /**
@@ -113,6 +116,7 @@ public class AWS {
      * @return Instance ID of the first launched instance.
      */
     public String createEC2(String script, String tagName, int numberOfInstances) {
+        
         Ec2Client ec2 = Ec2Client.builder().region(region2).build();
 
         // Configure the instance launch request
@@ -155,37 +159,80 @@ public class AWS {
      * @return true if such an instance exists, false otherwise.
      */
     public boolean isManagerInstanceRunning() {
+        try {
+                Thread.sleep(6000);
+        } catch (InterruptedException e) {
+                e.printStackTrace();
+        }
         // Define a filter for the tag "Name=Manager"
         Filter tagFilter = Filter.builder()
                 .name("tag:Name")
-                .values("Manager")
+                .values("Manager") // We are looking for instances with the "Name" tag set to "Manager"
                 .build();
-
+    
         // Define a filter for the instance state "running"
         Filter stateFilter = Filter.builder()
                 .name("instance-state-name")
-                .values("running")
+                .values("running") // We want to find instances that are "running"
                 .build();
-
+    
         // Build the describe instances request with the filters
         DescribeInstancesRequest request = DescribeInstancesRequest.builder()
                 .filters(tagFilter, stateFilter)
                 .build();
-
+    
         // Retrieve the instances
         DescribeInstancesResponse response = getInstance().ec2.describeInstances(request);
         List<Reservation> reservations = response.reservations();
 
         // Check if there are any instances matching the filters
         for (Reservation reservation : reservations) {
-            if (!reservation.instances().isEmpty()) {
-                System.out.println("[DEBUG] Manager instance is already running.");
-                return true;
-            }
-        }
+            for (Instance instance : reservation.instances()) {
+                // Log instance ID and its state for better debugging
+                System.out.println("[DEBUG] Found instance: " + instance.instanceId() + " with state: " + instance.state().name());
 
+                // Check if the instance is in the RUNNING state
+                if (instance.state().name().equals(InstanceStateName.RUNNING)) {
+                    System.out.println("[DEBUG] Manager instance is already running with Instance ID: " + instance.instanceId());
+                    return true;
+                    }
+                }
+            }
         System.out.println("[DEBUG] No running Manager instance found.");
         return false;
+    }
+
+    // Function to retrieve all EC2 instances
+    public boolean getAllInstances() {
+        try {
+            // Create a DescribeInstancesRequest to get all instances
+            DescribeInstancesRequest request = DescribeInstancesRequest.builder()
+                    .build();
+
+            // Retrieve all instances
+            DescribeInstancesResponse response = ec2.describeInstances(request);
+            System.out.println("Tamar 1");
+            // Iterate through reservations and instances to print details
+            List<Reservation> reservations = response.reservations();
+            for (Reservation reservation : reservations) {
+                System.out.println("Tamar 2");
+                List<Instance> instances = reservation.instances();
+                for (Instance instance : instances) {
+                    System.out.println("Tamar 3");
+                    System.out.println("Instance ID: " + instance.instanceId());
+                    System.out.println("Instance Type: " + instance.instanceType());
+                    System.out.println("State: " + instance.state().name());
+                    System.out.println("Public IP: " + instance.publicIpAddress());
+                    System.out.println("Private IP: " + instance.privateIpAddress());
+                    System.out.println("Tags: " + instance.tags());
+                    System.out.println("----------------------------------------------------");
+                }
+            }
+
+        } catch (Exception e) {
+            System.err.println("Error retrieving EC2 instances: " + e.getMessage());
+        }
+        return true;
     }
 
     /**
@@ -350,12 +397,12 @@ public String uploadJar(String filePath, String bucketName) {
         boolean fileExists = checkIfFileExistsInS3(bucketName, fileName);
 
         if (fileExists) {
-            System.out.println("File already exists in the bucket: " + fileName);
+            System.out.println("File already exists in the bucket. fileName: " + fileName);
         } else {
             // If the file does not exist, upload it
             String fileKey = uploadFileToS3(filePath, bucketName);
             if (fileKey != null) {
-                System.out.println("File successfully uploaded to the bucket: " + fileName);
+                System.out.println("File successfully uploaded to the bucket. fileName: " + fileName);
                 return "s3://" + bucketName + "/" + fileKey;
             }
             else {
@@ -363,7 +410,6 @@ public String uploadJar(String filePath, String bucketName) {
                 return "";
             }
         }
-
         // Return the S3 path if the file already exists
         return "s3://" + bucketName + "/" + fileName;
     } catch (S3Exception e) {
@@ -399,39 +445,11 @@ public String uploadJar(String filePath, String bucketName) {
             "#!/bin/bash",
             "sudo yum update -y",
             "sudo yum install -y java-1.8.0-openjdk", // Install Java if needed
-            "aws s3 cp s3://" + bucketName + "/" + Paths.get(jarFilePath).getFileName() + " /home/ec2-user/manager.jar",
-            "aws s3 cp s3://" + bucketName + "/" + Paths.get(workerJarPath).getFileName() + " /home/ec2-user/worker.jar",
+            "aws s3 cp " + jarFilePath, // + " /home/ec2-user/manager.jar",
+            "aws s3 cp " + workerJarPath, // + " /home/ec2-user/worker.jar",
             "java -jar /home/ec2-user/manager.jar " + queueName // Run the JAR with the queue name as an argument
         );
         return script;
-    }
-
-    private static List<String> aws_credentials_loader() {
-        // Specify the file path
-        String credentialsFilePath = "C:\\Users\\tamar\\.aws\\credentials";
-
-        // List to store credentials
-        List<String> creds = new ArrayList<>();
-
-        // Read the file line by line
-        try (BufferedReader reader = new BufferedReader(new FileReader(credentialsFilePath))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                // Split each line at the '=' character
-                String[] parts = line.split("=", 2);
-                if (parts.length == 2) {
-                    creds.add(parts[1].trim());  // Add the value part of the key-value pair
-                }
-            }
-
-            if (creds.size() < 3) {
-                System.err.println("Error: Not enough credentials found in the file.");
-            }
-
-        } catch (IOException e) {
-            System.err.println("Error reading credentials file: " + e.getMessage());
-        }
-        return creds;
     }
 
 }
