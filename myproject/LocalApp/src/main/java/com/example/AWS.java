@@ -445,11 +445,15 @@ public String uploadJar(String filePath, String bucketName) {
             "#!/bin/bash",
             "sudo yum update -y",
             "sudo yum install -y java-1.8.0-openjdk", // Install Java if needed
-            "aws s3 cp " + jarFilePath, // + " /home/ec2-user/manager.jar",
-            "aws s3 cp " + workerJarPath, // + " /home/ec2-user/worker.jar",
-            "java -jar /home/ec2-user/manager.jar " + queueName // Run the JAR with the queue name as an argument
+            "mkdir -p /home/ec2-user",               // Ensure directory exists
+            // "aws s3 cp " + jarFilePath + " /home/ec2-user/manager.jar", // Download manager.jar
+            "aws s3 cp s3://" + bucketName + "/" + jarFilePath + " /home/ec2-user/" + jarFilePath + "\n"+ 
+            "aws s3 cp s3://" + bucketName + "/" + workerJarPath + " /home/ec2-user/" + workerJarPath + "\n"+ 
+            // "aws s3 cp " + workerJarPath + " /home/ec2-user/worker.jar", // Download worker.jar
+            "java -jar /home/ec2-user/"+ jarFilePath + " " + queueName // Run the manager JAR
         );
         return script;
     }
+    
 
 }

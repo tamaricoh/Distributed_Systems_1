@@ -96,7 +96,7 @@ public class LocalApplication{
             initalizeManager();
             file_key_S3 = listenToSQS(file_key_S3, aws, SQS_READY);
             if(file_key_S3.contentEquals("terminate")){
-                System.out.println("Server is shutting down, please try gain later...");
+                System.out.println("Server is shutting down, please try again later...");
                 System.exit(0);
             }
             if(aws.downloadFileFromS3(FILES_BUCKET, file_key_S3, output_file_path + ".txt")){
