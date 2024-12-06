@@ -28,6 +28,7 @@ public class ManagerLocalRun implements Runnable {
 
     @Override
     public void run() {
+        aws.sendSQSMessage("Tamar", "test");
         while (!terminate) {
             String[] msg = aws.getMessage(LOCALAPP_TO_MANAGER_QUEUE_NAME);
             if (msg == null) {

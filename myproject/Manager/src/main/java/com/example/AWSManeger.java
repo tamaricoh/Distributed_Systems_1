@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
+import java.util.List;
 
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.Ec2Client;
@@ -44,6 +45,9 @@ import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SqsException;
+import software.amazon.awssdk.services.sqs.model.Message;
+import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
+import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
 
 public class AWSManeger {
     private final S3Client s3Client;
@@ -93,7 +97,8 @@ public class AWSManeger {
                     .build();
 
             // Receive messages from the queue
-            var messages = sqsClient.receiveMessage(receiveRequest).messages();
+            ReceiveMessageResponse receiveMessageResponse = sqsClient.receiveMessage(receiveRequest);
+            List<Message> messages = receiveMessageResponse.messages();  // Explicitly declaring the type
 
             if (messages.isEmpty()) {
                 System.out.println("No messages in the queue.");
@@ -220,27 +225,17 @@ public class AWSManeger {
     }
 
     public void sendSQSMessage(String message, String queueName) {
-        try {
-            // Retrieve the queue URL
-            GetQueueUrlRequest getQueueUrlRequest = GetQueueUrlRequest.builder()
-                    .queueName(queueName)
-                    .build();
-
-            GetQueueUrlResponse queueUrlResponse = getInstance().sqsClient.getQueueUrl(getQueueUrlRequest);
-            String queueUrl = queueUrlResponse.queueUrl();
-
-            // Send the message
+        try{
             SendMessageRequest sendMessageRequest = SendMessageRequest.builder()
-                    .queueUrl(queueUrl)
-                    .messageBody(message)
-                    .build();
-            getInstance().sqsClient.sendMessage(sendMessageRequest);
-
-            System.out.println("SQS Message Sent: " + message);
-        } catch (SqsException e) {
-            System.err.println("Error sending SQS message: " + e.awsErrorDetails().errorMessage());
+                .queueUrl(getQueueUrl(queueName))
+                .messageBody(message)
+                .build();
+                getInstance().sqsClient.sendMessage(sendMessageRequest);
+            System.err.println("Message from LocalApp sent to " + queueName + " queue: " + message);
+        }catch (SqsException e){
+                System.err.println("[DEBUG]: Error trying to send message to queue " + queueName + ", Error Message: " + e.awsErrorDetails().errorMessage());
         }
-    }
+    }   
 
     public String createEC2(String script, String tagName, int numberOfInstances) {
         Ec2Client ec2 = Ec2Client.builder().region(region2).build();

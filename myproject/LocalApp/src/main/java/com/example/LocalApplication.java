@@ -9,6 +9,7 @@ public class LocalApplication{
     private static String FILES_BUCKET = "text-file-bucket-101";
     static String SQS_CLIENT = "localapp-to-manager";
     static String SQS_READY = "manager-to-localapp";
+    static String SQS_TEST= "test";
 
     static AWS aws = AWS.getInstance();
     static String dilimeter = " ";
@@ -39,28 +40,28 @@ public class LocalApplication{
         aws.createBucketIfNotExists(FILES_BUCKET);
         aws.createSqsQueue(SQS_CLIENT);
         aws.createSqsQueue(SQS_READY);
+        aws.createSqsQueue(SQS_TEST);
     }
     
     public static void initalizeManager(){
         if(aws.isManagerInstanceRunning()){
             return;
         }
-        // if(aws.getAllInstances()){
-        //     return;
-        // }
         aws.createBucketIfNotExists(EC2_BUCKET);
         String manager_path_s3 = aws.uploadJar(MANAGER_JAR, EC2_BUCKET);
         // aws.uploadJar(WORKER_JAR, EC2_BUCKET);
         String workerJarPath = aws.uploadJar(WORKER_JAR, EC2_BUCKET);
         if (manager_path_s3 != "" && workerJarPath != ""){
-            String userDataScript = aws.generateManagerUserDataScript(EC2_BUCKET, manager_path_s3, SQS_CLIENT, workerJarPath);
+            System.out.println(manager_path_s3 + " Tamar ---------");
+            System.out.println(workerJarPath + " Tamar ---------");
+            String userDataScript = aws.generateManagerUserDataScript(EC2_BUCKET, manager_path_s3, workerJarPath);
             aws.createEC2(userDataScript, "Manager", 1);
         }
     }
 
     //TODO:: terminateManager: should we wait for an update message from the manager on successfull termination?
     public static void terminateManager(AWS aws) {
-        aws.sendSQSMessage("terminate", SQS_CLIENT);
+        aws.sendSQSMessage(SQS_CLIENT, "terminate");
         if(listenToSQS("terminate", aws, SQS_READY).contentEquals("terminate")){
             System.out.println("Manager shut down successfully");
             System.exit(0);
@@ -91,8 +92,9 @@ public class LocalApplication{
                 System.exit(0);
             }
             //message format - <file_location_s3>:::<lines_per_worker>
+            aws.sendSQSMessage("localapp-to-manager", "Tamar");
             String msg = file_key_S3 + dilimeter + n;
-            aws.sendSQSMessage(msg, SQS_CLIENT);
+            aws.sendSQSMessage(SQS_CLIENT, msg);
             initalizeManager();
             file_key_S3 = listenToSQS(file_key_S3, aws, SQS_READY);
             if(file_key_S3.contentEquals("terminate")){
