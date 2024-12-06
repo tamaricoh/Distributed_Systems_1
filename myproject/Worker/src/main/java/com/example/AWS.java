@@ -141,19 +141,18 @@ public class AWS {
      * @param queueUrl The URL of the SQS queue.
      * @param messageBody The content of the new message.
      */
-    public void sendMessage(String QueueName, String messageBody) {
-        try {
-            SendMessageRequest sendRequest = SendMessageRequest.builder()
-                    .queueUrl(getQueueUrl(QueueName))
-                    .messageBody(messageBody)
-                    .build();
-
-            sqsClient.sendMessage(sendRequest);
-            System.out.println("Message sent successfully.");
-        } catch (SqsException e) {
-            System.err.println("Error sending message: " + e.awsErrorDetails().errorMessage());
+    public void sendMessage(String queueName, String message) {
+        try{
+            SendMessageRequest sendMessageRequest = SendMessageRequest.builder()
+                .queueUrl(getQueueUrl(queueName))
+                .messageBody(message)
+                .build();
+                getInstance().sqsClient.sendMessage(sendMessageRequest);
+            System.err.println("Message from LocalApp sent to " + queueName + " queue: " + message);
+        }catch (SqsException e){
+                System.err.println("[DEBUG]: Error trying to send message to queue " + queueName + ", Error Message: " + e.awsErrorDetails().errorMessage());
         }
-    }
+    }   
 
     /**
      * Retrieves the URL of an SQS queue by its name.

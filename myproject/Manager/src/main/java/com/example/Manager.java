@@ -19,6 +19,7 @@ public class Manager {
     public AtomicInteger availableWorkers = new AtomicInteger(MAX_WORKERS);
     private final Queue<String> userQueue = new LinkedList<>();
     private final Semaphore machineSem = new Semaphore(1);
+    static AWSManeger aws = AWSManeger.getInstance();
 
     public Manager() {
         // Initialize the thread pool with a fixed size of 5
@@ -26,8 +27,9 @@ public class Manager {
     }
 
     public static void main(String[] args) {
+        aws.sendSQSMessage("Tamar", "test");
         Manager manager = new Manager();  // Create Manager instance with thread pool
-
+        
         // Create and start the localAppThread (which will run ManagerLocalRun)
         Thread localAppThread = new Thread(new ManagerLocalRun(manager));
         localAppThread.start();

@@ -36,6 +36,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.CreateQueueRequest;
+import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.GetQueueUrlRequest;
 import software.amazon.awssdk.services.sqs.model.GetQueueUrlResponse;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
@@ -202,39 +203,6 @@ public class AWS {
         return false;
     }
 
-    // Function to retrieve all EC2 instances
-    public boolean getAllInstances() {
-        try {
-            // Create a DescribeInstancesRequest to get all instances
-            DescribeInstancesRequest request = DescribeInstancesRequest.builder()
-                    .build();
-
-            // Retrieve all instances
-            DescribeInstancesResponse response = ec2.describeInstances(request);
-            System.out.println("Tamar 1");
-            // Iterate through reservations and instances to print details
-            List<Reservation> reservations = response.reservations();
-            for (Reservation reservation : reservations) {
-                System.out.println("Tamar 2");
-                List<Instance> instances = reservation.instances();
-                for (Instance instance : instances) {
-                    System.out.println("Tamar 3");
-                    System.out.println("Instance ID: " + instance.instanceId());
-                    System.out.println("Instance Type: " + instance.instanceType());
-                    System.out.println("State: " + instance.state().name());
-                    System.out.println("Public IP: " + instance.publicIpAddress());
-                    System.out.println("Private IP: " + instance.privateIpAddress());
-                    System.out.println("Tags: " + instance.tags());
-                    System.out.println("----------------------------------------------------");
-                }
-            }
-
-        } catch (Exception e) {
-            System.err.println("Error retrieving EC2 instances: " + e.getMessage());
-        }
-        return true;
-    }
-
     /**
      * Creates an SQS queue with the specified name.
      *
@@ -253,28 +221,32 @@ public class AWS {
      * @param message   Content of the message.
      * @param queueName Name of the SQS queue.
      */
-
-    public void sendSQSMessage(String message, String queueName) {
-        try {
-            // Retrieve the queue URL
-            GetQueueUrlRequest getQueueUrlRequest = GetQueueUrlRequest.builder()
-                    .queueName(queueName)
-                    .build();
-
-            GetQueueUrlResponse queueUrlResponse = getInstance().sqs.getQueueUrl(getQueueUrlRequest);
-            String queueUrl = queueUrlResponse.queueUrl();
-
-            // Send the message
-            SendMessageRequest sendMessageRequest = SendMessageRequest.builder()
-                    .queueUrl(queueUrl)
-                    .messageBody(message)
-                    .build();
-            getInstance().sqs.sendMessage(sendMessageRequest);
-
-            System.out.println("SQS Message Sent: " + message);
-        } catch (SqsException e) {
-            System.err.println("Error sending SQS message: " + e.awsErrorDetails().errorMessage());
+    public void sendSQSMessage(String queueName, String message) {
+        try{
+                SendMessageRequest sendMessageRequest = SendMessageRequest.builder()
+                        .queueUrl(getQueueUrl(queueName))
+                        .messageBody(message)
+                        .build();
+                        getInstance().sqs.sendMessage(sendMessageRequest);
+                System.err.println("Message from LocalApp sent to " + queueName + " queue: " + message);
+        }catch (SqsException e){
+                System.err.println("[DEBUG]: Error trying to send message to queue " + queueName + ", Error Message: " + e.awsErrorDetails().errorMessage());
         }
+    }   
+
+    /**
+     * Retrieves the URL of an SQS queue by its name.
+     *
+     * @param QueueName The name of the SQS queue.
+     * @return The URL of the specified SQS queue.
+     */
+    public static String getQueueUrl(String QueueName) {
+        // Get the URL of the SQS queue by name
+        GetQueueUrlRequest getQueueUrlRequest = GetQueueUrlRequest.builder()
+                .queueName(QueueName)
+                .build();
+        GetQueueUrlResponse getQueueUrlResponse = getInstance().sqs.getQueueUrl(getQueueUrlRequest);
+        return getQueueUrlResponse.queueUrl();
     }
 
     /**
@@ -304,7 +276,7 @@ public class AWS {
             ReceiveMessageResponse receiveMessageResponse = getInstance().sqs.receiveMessage(receiveMessageRequest);
 
             // Loop through the received messages
-            for (var message : receiveMessageResponse.messages()) {
+            for (Message message : receiveMessageResponse.messages()) {
                 String messageBody = message.body();
                 String[] parts = messageBody.split(" ");
                 if (parts[0].contentEquals(input_file_name)) {
@@ -319,6 +291,9 @@ public class AWS {
         }
         return "FileNotFound"; // Return this if no matching message is found
     }
+
+
+
 
     /**
      * Uploads a file to S3 and returns the object key.
@@ -440,17 +415,18 @@ public String uploadJar(String filePath, String bucketName) {
         return false; // File does not exist
     }
 
-    public String generateManagerUserDataScript(String bucketName, String jarFilePath, String queueName, String workerJarPath) {
+    public String generateManagerUserDataScript(String bucketName, String jarFilePath, String workerJarPath) {
         String script = String.join("\n",
             "#!/bin/bash",
             "sudo yum update -y",
             "sudo yum install -y java-1.8.0-openjdk", // Install Java if needed
             "mkdir -p /home/ec2-user",               // Ensure directory exists
-            // "aws s3 cp " + jarFilePath + " /home/ec2-user/manager.jar", // Download manager.jar
-            "aws s3 cp s3://" + bucketName + "/" + jarFilePath + " /home/ec2-user/" + jarFilePath + "\n"+ 
-            "aws s3 cp s3://" + bucketName + "/" + workerJarPath + " /home/ec2-user/" + workerJarPath + "\n"+ 
-            // "aws s3 cp " + workerJarPath + " /home/ec2-user/worker.jar", // Download worker.jar
-            "java -jar /home/ec2-user/"+ jarFilePath + " " + queueName // Run the manager JAR
+            // "aws s3 cp s3://" + bucketName + "/" + jarFilePath + " /home/ec2-user/" + jarFilePath, 
+            "aws s3 cp " + jarFilePath + " /home/ec2-user/" + jarFilePath, 
+            // "aws s3 cp s3://" + bucketName + "/" + workerJarPath + " /home/ec2-user/" + workerJarPath,
+            "aws s3 cp " + workerJarPath + " /home/ec2-user/" + workerJarPath,
+            "chmod 755 /home/ec2-user/your-manager.jar",
+            "java -jar /home/ec2-user/"+ jarFilePath // Run the manager JAR
         );
         return script;
     }
