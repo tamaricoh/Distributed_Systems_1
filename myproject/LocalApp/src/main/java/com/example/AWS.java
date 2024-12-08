@@ -378,7 +378,7 @@ public String uploadJar(String filePath, String bucketName) {
             String fileKey = uploadFileToS3(filePath, bucketName);
             if (fileKey != null) {
                 System.out.println("File successfully uploaded to the bucket. fileName: " + fileName);
-                return "s3://" + bucketName + "/" + fileKey;
+                return fileKey;
             }
             else {
                 System.out.println("Unexpected error during file upload: " + fileName);
@@ -386,7 +386,7 @@ public String uploadJar(String filePath, String bucketName) {
             }
         }
         // Return the S3 path if the file already exists
-        return "s3://" + bucketName + "/" + fileName;
+        return fileName;
     } catch (S3Exception e) {
         throw new RuntimeException("Error during file upload process: " + e.awsErrorDetails().errorMessage(), e);
     }
@@ -418,14 +418,13 @@ public String uploadJar(String filePath, String bucketName) {
     public String generateManagerUserDataScript(String bucketName, String jarFilePath, String workerJarPath) {
         String script = String.join("\n",
             "#!/bin/bash",
-            "sudo yum update -y",
+            // "sudo yum update -y",
             "sudo yum install -y java-1.8.0-openjdk", // Install Java if needed
             "mkdir -p /home/ec2-user",               // Ensure directory exists
-            // "aws s3 cp s3://" + bucketName + "/" + jarFilePath + " /home/ec2-user/" + jarFilePath, 
-            "aws s3 cp " + jarFilePath + " /home/ec2-user/" + jarFilePath, 
-            // "aws s3 cp s3://" + bucketName + "/" + workerJarPath + " /home/ec2-user/" + workerJarPath,
-            "aws s3 cp " + workerJarPath + " /home/ec2-user/" + workerJarPath,
-            "chmod 755 /home/ec2-user/your-manager.jar",
+            "aws s3 cp s3://" + bucketName + "/" + jarFilePath + " /home/ec2-user/" + jarFilePath, 
+            // "aws s3 cp " + jarFilePath + " /home/ec2-user/" + jarFilePath, 
+            "aws s3 cp s3://" + bucketName + "/" + workerJarPath + " /home/ec2-user/" + workerJarPath,
+            // "aws s3 cp " + workerJarPath + " /home/ec2-user/" + workerJarPath,
             "java -jar /home/ec2-user/"+ jarFilePath // Run the manager JAR
         );
         return script;
