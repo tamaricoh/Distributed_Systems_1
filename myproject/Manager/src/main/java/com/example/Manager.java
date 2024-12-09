@@ -2,7 +2,6 @@ package com.example;
 
 import java.util.Queue;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -26,26 +25,7 @@ public class Manager {
         threadPool = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
     }
 
-    public static void main(String[] args) {
-        aws.sendSQSMessage("Tamar", "test");
-        Manager manager = new Manager();  // Create Manager instance with thread pool
-        
-        // Create and start the localAppThread (which will run ManagerLocalRun)
-        Thread localAppThread = new Thread(new ManagerLocalRun(manager));
-        localAppThread.start();
-
-        try {
-            localAppThread.join();  // Wait for the localAppThread to finish
-        } catch (InterruptedException e) {
-            System.err.println("Main thread interrupted: " + e.getMessage());
-        }
-
-        System.out.println("All threads completed, exiting program.");
-
-        // Shut down the thread pool after use
-        manager.shutdown();
-    }
-
+    
     // Shutdown the thread pool gracefully
     public void shutdown() {
         if (threadPool != null && !threadPool.isShutdown()) {
@@ -114,4 +94,25 @@ public class Manager {
         }
         return 5;
     }
+
+    public static void main(String[] args) {
+        aws.sendSQSMessage("Tamar", "test");
+        Manager manager = new Manager();  // Create Manager instance with thread pool
+        
+        // Create and start the localAppThread (which will run ManagerLocalRun)
+        Thread localAppThread = new Thread(new ManagerLocalRun(manager));
+        localAppThread.start();
+
+        try {
+            localAppThread.join();  // Wait for the localAppThread to finish
+        } catch (InterruptedException e) {
+            System.err.println("Main thread interrupted: " + e.getMessage());
+        }
+
+        System.out.println("All threads completed, exiting program.");
+
+        // Shut down the thread pool after use
+        manager.shutdown();
+    }
+
 }

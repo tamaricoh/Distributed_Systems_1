@@ -44,9 +44,8 @@ import software.amazon.awssdk.services.sqs.model.GetQueueUrlResponse;
 import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
+import software.amazon.awssdk.services.sqs.model.SendMessageResponse;
 import software.amazon.awssdk.services.sqs.model.SqsException;
-import software.amazon.awssdk.services.sqs.model.Message;
-import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
 
 public class AWSManeger {
@@ -122,19 +121,13 @@ public class AWSManeger {
         }
     }
 
-    /**
-     * Retrieves the URL of an SQS queue by its name.
-     *
-     * @param QueueName The name of the SQS queue.
-     * @return The URL of the specified SQS queue.
-     */
-    public String getQueueUrl(String QueueName) {
-        // Get the URL of the SQS queue by name
-        GetQueueUrlRequest getQueueUrlRequest = GetQueueUrlRequest.builder()
-                .queueName(QueueName)
-                .build();
-        GetQueueUrlResponse getQueueUrlResponse = sqsClient.getQueueUrl(getQueueUrlRequest);
-        return getQueueUrlResponse.queueUrl();
+    private static String getQueueUrl (String queueName) {
+        try {
+            return getInstance().sqsClient.getQueueUrl(builder -> builder.queueName(queueName)).queueUrl();
+        } catch (Exception e) {
+            System.err.println("Error retrieving queue URL: " + e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -195,7 +188,6 @@ public class AWSManeger {
         }
     }
 
-    
 
     /**
      * Uploads a file to S3 and returns the object key.
@@ -231,11 +223,12 @@ public class AWSManeger {
                 .messageBody(message)
                 .build();
                 getInstance().sqsClient.sendMessage(sendMessageRequest);
-            System.err.println("Message from LocalApp sent to " + queueName + " queue: " + message);
+            System.err.println("Message from Manager sent to " + queueName + " queue: " + message);
         }catch (SqsException e){
                 System.err.println("[DEBUG]: Error trying to send message to queue " + queueName + ", Error Message: " + e.awsErrorDetails().errorMessage());
         }
-    }   
+    } 
+
 
     public String createEC2(String script, String tagName, int numberOfInstances) {
         Ec2Client ec2 = Ec2Client.builder().region(region2).build();
@@ -396,6 +389,7 @@ public class AWSManeger {
             System.err.println("Error deleting bucket: " + e.getMessage());
         }
     }
+
 
     public void shutdown() {
         String instanceId = getInstanceId();

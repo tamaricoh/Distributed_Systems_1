@@ -3,10 +3,10 @@ package com.example;
 import java.io.File;
 
 public class LocalApplication{
-    private static String MANAGER_JAR = "C:\\Users\\tamar\\Desktop\\B.Sc\\Semester G\\AWS\\Assignment_1\\myproject\\Manager\\target\\Manager-1.0-SNAPSHOT.jar";
-    private static String WORKER_JAR = "C:\\Users\\tamar\\Desktop\\B.Sc\\Semester G\\AWS\\Assignment_1\\myproject\\Worker\\target\\Worker-1.0-SNAPSHOT.jar";
-    private static String EC2_BUCKET = "jar-bucket-101";
-    private static String FILES_BUCKET = "text-file-bucket-101";
+    private static String MANAGER_JAR = "/home/yarden/Distributed_Systems_1/myproject/Manager/target/Manager-1.0-SNAPSHOT.jar";
+    private static String WORKER_JAR = "/home/yarden/Distributed_Systems_1/myproject/Worker/target/Worker-1.0-SNAPSHOT.jar";
+    private static String EC2_BUCKET = "jar-bucket-103";
+    private static String FILES_BUCKET = "text-file-bucket-103";
     static String SQS_CLIENT = "localapp-to-manager";
     static String SQS_READY = "manager-to-localapp";
     static String SQS_TEST= "test";
@@ -48,13 +48,10 @@ public class LocalApplication{
             return;
         }
         aws.createBucketIfNotExists(EC2_BUCKET);
-        String manager_path_s3 = aws.uploadJar(MANAGER_JAR, EC2_BUCKET);
-        // aws.uploadJar(WORKER_JAR, EC2_BUCKET);
-        String workerJarPath = aws.uploadJar(WORKER_JAR, EC2_BUCKET);
-        if (manager_path_s3 != "" && workerJarPath != ""){
-            System.out.println(manager_path_s3 + " Tamar ---------");
-            System.out.println(workerJarPath + " Tamar ---------");
-            String userDataScript = aws.generateManagerUserDataScript(EC2_BUCKET, manager_path_s3, workerJarPath);
+        String jar_key_s3 = aws.uploadJar(MANAGER_JAR, EC2_BUCKET);
+        String worker_jar_key_s3 = aws.uploadJar(WORKER_JAR, EC2_BUCKET);
+        if (jar_key_s3 != "" && worker_jar_key_s3 != ""){
+            String userDataScript = aws.generateManagerUserDataScript(EC2_BUCKET, jar_key_s3, worker_jar_key_s3);
             aws.createEC2(userDataScript, "Manager", 1);
         }
     }
