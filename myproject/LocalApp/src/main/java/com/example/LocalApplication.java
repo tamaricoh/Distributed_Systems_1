@@ -3,10 +3,10 @@ package com.example;
 import java.io.File;
 
 public class LocalApplication{
-    private static String MANAGER_JAR = "/home/yarden/Distributed_Systems_1/myproject/Manager/target/Manager-1.0-SNAPSHOT.jar";
-    private static String WORKER_JAR = "/home/yarden/Distributed_Systems_1/myproject/Worker/target/Worker-1.0-SNAPSHOT.jar";
-    private static String EC2_BUCKET = "jar-bucket-103";
-    private static String FILES_BUCKET = "text-file-bucket-103";
+    private static String MANAGER_JAR = "C:\\Users\\tamar\\Desktop\\B.Sc\\Semester G\\AWS\\Assignment_1\\myproject\\Manager\\target\\Manager-1.0-SNAPSHOT.jar";
+    private static String WORKER_JAR = "C:\\Users\\tamar\\Desktop\\B.Sc\\Semester G\\AWS\\Assignment_1\\myproject\\Worker\\target\\Worker-1.0-SNAPSHOT.jar";
+    private static String EC2_BUCKET = "jar-bucket-101";
+    private static String FILES_BUCKET = "text-file-bucket-101";
     static String SQS_CLIENT = "localapp-to-manager";
     static String SQS_READY = "manager-to-localapp";
     static String SQS_TEST= "test";
@@ -89,7 +89,6 @@ public class LocalApplication{
                 System.exit(0);
             }
             //message format - <file_location_s3>:::<lines_per_worker>
-            aws.sendSQSMessage("localapp-to-manager", "Tamar");
             String msg = file_key_S3 + dilimeter + n;
             aws.sendSQSMessage(SQS_CLIENT, msg);
             initalizeManager();
