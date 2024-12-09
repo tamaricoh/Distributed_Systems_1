@@ -105,7 +105,7 @@ public class AWSManeger {
             List<Message> messages = receiveMessageResponse.messages();  // Explicitly declaring the type
 
             if (messages.isEmpty()) {
-                System.out.println("No messages in the queue.");
+                System.out.println("No messages in the queue: " + QUEUE_NAME);
                 return null; // No message was processed
             }
 
@@ -177,7 +177,7 @@ public class AWSManeger {
                 .build();
 
         // Specify the local file path to download the file to
-        Path destinationPath = Paths.get("downloaded-file"); // Modify this path if needed
+        Path destinationPath = Paths.get("downloaded-file");
 
         // Download the file from S3 to an input stream
         ResponseInputStream<GetObjectResponse> s3Object = s3Client.getObject(getObjectRequest);
@@ -284,13 +284,33 @@ public class AWSManeger {
         return instanceId;
     }
 
-    public String generateWorkerDataScript(String BUCKET_NAME, String jarFilePath, String LocalAppID) {
+    public String generateWorkerDataScript(String bucketName, String jarKey, String localAppId) {
         String script = String.join("\n",
             "#!/bin/bash",
+            "set -e", // Exit immediately if a command exits with a non-zero status
+            "LOG_FILE=/var/log/worker-setup.log",
+            "exec > >(tee -a $LOG_FILE) 2>&1", // Redirect all output to log file
+            "echo \"Starting EC2 setup for Worker...\"",
+    
+            // Install necessary software
             "sudo yum update -y",
-            "sudo yum install -y java-1.8.0-openjdk", // Install Java if needed
-            "aws s3 cp s3://" + BUCKET_NAME + "/" + Paths.get(jarFilePath).getFileName() + " /home/ec2-user/manager.jar",
-            "export LOCAL_APP_ID=" + LocalAppID // Set LOCAL_APP_ID environment variable
+            "sudo yum install -y java-1.8.0-openjdk",
+            "sudo yum install -y aws-cli",
+    
+            // Prepare the working directory
+            "WORK_DIR=/home/ec2-user/worker",
+            "mkdir -p $WORK_DIR",
+            "cd $WORK_DIR",
+    
+            // Download the JAR file
+            "echo \"Downloading Worker JAR file from S3...\"",
+            "aws s3 cp s3://" + bucketName + "/" + jarKey + " ./worker.jar",
+    
+            // Execute the JAR with LocalAppID as an argument
+            "echo \"Running the Worker application...\"",
+            "java -jar ./worker.jar " + localAppId + " > $WORK_DIR/app.log 2>&1 &", // Pass LocalAppID to the JAR
+    
+            "echo \"Worker setup complete\""
         );
         return script;
     }
