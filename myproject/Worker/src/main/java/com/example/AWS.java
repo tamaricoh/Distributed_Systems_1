@@ -113,7 +113,8 @@ public class AWS {
                     .receiptHandle(receiptHandle)
                     .build();
 
-            sqsClient.deleteMessage(deleteRequest);;
+            sqsClient.deleteMessage(deleteRequest);
+            System.err.println("Message deleted");
         } catch (SqsException e) {
             System.err.println("Error deleting message: " + e.awsErrorDetails().errorMessage());
         }

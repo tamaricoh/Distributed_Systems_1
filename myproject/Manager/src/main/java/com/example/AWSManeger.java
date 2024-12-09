@@ -309,7 +309,7 @@ public class AWSManeger {
     
             // Execute the JAR with LocalAppID as an argument
             "echo \"Running the Worker application...\"",
-            "java -jar ./worker.jar " + localAppId + " > $WORK_DIR/app.log 2>&1 &", // Pass LocalAppID to the JAR
+            // "java -jar ./worker.jar " + localAppId + " > $WORK_DIR/app.log 2>&1 &", // Pass LocalAppID to the JAR // TAMAR
     
             "echo \"Worker setup complete\""
         );

@@ -135,7 +135,7 @@ public class PDFConverter {
         } catch (MalformedURLException e) {
             return "Error: Invalid URL format. " + e.getMessage();
         } catch (IOException e) {
-            return "Error: Unable to download file. " + e.getMessage();
+            return "Error: Unable to download file. " + url + " === " + destinationFile + "====" +e.getMessage();
         }
     }
 }

@@ -16,6 +16,7 @@ public class Worker{
     static String localAppID;
     public Boolean terminate;
     static AWS aws = AWS.getInstance();
+    private static final String DOWNLOAD_DIRECTORY = "/tmp/downloads/";
 
     // Constructor
     public Worker(String LocalAppId) {
@@ -26,15 +27,23 @@ public class Worker{
         this.terminate = false;
     }
 
+    public static void ensureDownloadDirectoryExists() {
+        File downloadDir = new File(DOWNLOAD_DIRECTORY);
+        if (!downloadDir.exists()) {
+            boolean created = downloadDir.mkdirs();
+            if (!created) {
+                System.err.println("Failed to create download directory: " + DOWNLOAD_DIRECTORY);
+            }
+        }
+    }
+
     // @Override
     public void startWorker() {
         while(!this.terminate){
             Message msg = aws.getMessage(MANAGER_TO_WORKERS_QUEUE);
-            // String msg = "ToImage http://www.bethelnewton.org/images/Passover_Guide_BOOKLET.pdf";
             if (msg != null){
                 try{
                     String task = msg.body();
-                    // String task = msg;
                     if (task.contentEquals("terminate")) {
                         terminate = true;  // Set terminate flag to true to break the loop
                         aws.sendMessage(WORKERS_TO_MANAGER_QUEUE, "terminting");
@@ -72,6 +81,7 @@ public class Worker{
     }
 
     public static void main(String[] args){
+        ensureDownloadDirectoryExists();
         Worker worker = new Worker(args[0]);
         worker.startWorker();
         aws.sendMessage(WORKERS_TO_MANAGER_QUEUE, "terminating");
