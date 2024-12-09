@@ -8,9 +8,12 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Base64;
 import java.util.List;
 
+import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.CreateTagsRequest;
@@ -29,6 +32,7 @@ import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 import software.amazon.awssdk.services.s3.model.DeleteBucketRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
@@ -44,8 +48,9 @@ import software.amazon.awssdk.services.sqs.model.GetQueueUrlResponse;
 import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
-import software.amazon.awssdk.services.sqs.model.SendMessageResponse;
 import software.amazon.awssdk.services.sqs.model.SqsException;
+import software.amazon.awssdk.services.sqs.model.Message;
+import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
 
 public class AWSManeger {
@@ -121,13 +126,19 @@ public class AWSManeger {
         }
     }
 
-    private static String getQueueUrl (String queueName) {
-        try {
-            return getInstance().sqsClient.getQueueUrl(builder -> builder.queueName(queueName)).queueUrl();
-        } catch (Exception e) {
-            System.err.println("Error retrieving queue URL: " + e.getMessage());
-            return null;
-        }
+    /**
+     * Retrieves the URL of an SQS queue by its name.
+     *
+     * @param QueueName The name of the SQS queue.
+     * @return The URL of the specified SQS queue.
+     */
+    public String getQueueUrl(String QueueName) {
+        // Get the URL of the SQS queue by name
+        GetQueueUrlRequest getQueueUrlRequest = GetQueueUrlRequest.builder()
+                .queueName(QueueName)
+                .build();
+        GetQueueUrlResponse getQueueUrlResponse = sqsClient.getQueueUrl(getQueueUrlRequest);
+        return getQueueUrlResponse.queueUrl();
     }
 
     /**
@@ -158,36 +169,43 @@ public class AWSManeger {
      * @return The local file path where the file was downloaded, or null if the download failed or the file was not found.
      */
     public Path downloadFileFromS3(String s3Location, String BUCKET_NAME) {
-        try {
-            // Create a GetObject request
-            GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                    .bucket(BUCKET_NAME)
-                    .key(s3Location)
-                    .build();
+    try {
+        // Create a GetObject request
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(BUCKET_NAME)
+                .key(s3Location)
+                .build();
 
-            // Specify the local file path to download the file to
-            Path destinationPath = Paths.get("downloaded-file"); // Modify this to specify the local download path
+        // Specify the local file path to download the file to
+        Path destinationPath = Paths.get("downloaded-file"); // Modify this path if needed
 
-            // Download the file from S3 to the local path
-            s3Client.getObject(getObjectRequest, destinationPath);
+        // Download the file from S3 to an input stream
+        ResponseInputStream<GetObjectResponse> s3Object = s3Client.getObject(getObjectRequest);
 
-            // Check if the file was successfully downloaded by checking its existence
-            if (Files.exists(destinationPath)) {
-                System.out.println("File downloaded successfully from S3 to: " + destinationPath);
-                return destinationPath; // Return the path if the file exists
-            } else {
-                System.err.println("File download failed, file not found at the destination.");
-                return null;
-            }
-        } catch (S3Exception e) {
-            System.err.println("Error downloading file from S3: " + e.getMessage());
-            return null;
-        } catch (Exception e) {
-            System.err.println("Unexpected error: " + e.getMessage());
+        // Write the file to the local destination
+        Files.copy(s3Object, destinationPath, StandardCopyOption.REPLACE_EXISTING);
+
+        // Ensure the file was successfully downloaded
+        if (Files.exists(destinationPath)) {
+            System.out.println("File downloaded successfully from S3 to: " + destinationPath);
+            return destinationPath;
+        } else {
+            System.err.println("File download failed, file not found at the destination.");
             return null;
         }
+    } catch (S3Exception e) {
+        System.err.println("Error downloading file from S3: " + e.getMessage());
+        return null;
+    } catch (IOException e) {
+        System.err.println("Error writing file to local system: " + e.getMessage());
+        return null;
+    } catch (Exception e) {
+        System.err.println("Unexpected error: " + e.getMessage());
+        return null;
     }
+}
 
+    
 
     /**
      * Uploads a file to S3 and returns the object key.
@@ -223,12 +241,11 @@ public class AWSManeger {
                 .messageBody(message)
                 .build();
                 getInstance().sqsClient.sendMessage(sendMessageRequest);
-            System.err.println("Message from Manager sent to " + queueName + " queue: " + message);
+            System.err.println("Message from LocalApp sent to " + queueName + " queue: " + message);
         }catch (SqsException e){
                 System.err.println("[DEBUG]: Error trying to send message to queue " + queueName + ", Error Message: " + e.awsErrorDetails().errorMessage());
         }
-    } 
-
+    }   
 
     public String createEC2(String script, String tagName, int numberOfInstances) {
         Ec2Client ec2 = Ec2Client.builder().region(region2).build();
@@ -389,7 +406,6 @@ public class AWSManeger {
             System.err.println("Error deleting bucket: " + e.getMessage());
         }
     }
-
 
     public void shutdown() {
         String instanceId = getInstanceId();

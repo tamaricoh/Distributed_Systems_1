@@ -10,7 +10,7 @@ public class ManagerWorkerRun implements Runnable {
 
     private static final String WORKERS_TO_MANAGER_QUEUE_NAME = "workers-to-manager";
     private static final String MANAGER_TO_LOCALAPP_QUEUE_NAME = "manager-to-localapp";
-    private static final String MANAGER_TO_WORKERS_QUEUE = "manager_to_workers";
+    private static final String MANAGER_TO_WORKERS_QUEUE_NAME = "manager_to_workers";
     private static String CLIENT_BUCKET = "text-file-bucket";
 
     static AWSManeger aws = AWSManeger.getInstance();
@@ -35,7 +35,8 @@ public class ManagerWorkerRun implements Runnable {
     @Override
     public void run() {
         while (!terminate && numOfCompletedTasks < numOfTasks) { // Stop when all tasks are processed
-            String[] msg = aws.getMessage(WORKERS_TO_MANAGER_QUEUE_NAME + localAppID);
+            System.out.println("TAMAR-1  =  " + WORKERS_TO_MANAGER_QUEUE_NAME + "-" + localAppID);
+            String[] msg = aws.getMessage(WORKERS_TO_MANAGER_QUEUE_NAME + "-" + localAppID);
             if (msg != null && msg.length == 3) { // Ensure message is valid
                 String stringMsg = msg[0] + " " + msg[1] + " " + msg[2];            
                 messagesArray[numOfCompletedTasks] = stringMsg; // Store message in array
@@ -81,12 +82,12 @@ public class ManagerWorkerRun implements Runnable {
     private void terminateWorkers() {
         //send termination message to workers
         for(int i =0; i<active_workers ; i++){
-            aws.sendSQSMessage("terminate", MANAGER_TO_WORKERS_QUEUE + localAppID);
+            aws.sendSQSMessage("terminate", MANAGER_TO_WORKERS_QUEUE_NAME + localAppID);
         }
         int instances = active_workers;
         //wait for all workers to shut down
         while(active_workers>0){
-            String[] msg = aws.getMessage(WORKERS_TO_MANAGER_QUEUE_NAME + localAppID);
+            String[] msg = aws.getMessage(WORKERS_TO_MANAGER_QUEUE_NAME + "-" + localAppID);
             if(msg != null & msg[0].contentEquals("terminating")){
                 active_workers--;
             }
@@ -100,10 +101,10 @@ public class ManagerWorkerRun implements Runnable {
     }
 
     private void deleteReasources(Boolean delete_bucket) {
-        aws.deleteQueue(MANAGER_TO_WORKERS_QUEUE + localAppID);
-        aws.deleteQueue(WORKERS_TO_MANAGER_QUEUE_NAME + localAppID);
+        aws.deleteQueue(MANAGER_TO_WORKERS_QUEUE_NAME + "-" + localAppID);
+        aws.deleteQueue(WORKERS_TO_MANAGER_QUEUE_NAME + "-" + localAppID);
         if(delete_bucket){
-            aws.deleteBucket("la-" + localAppID);
+            aws.deleteBucket("la-" + localAppID + "-101");
         }
         terminate = true;   
     }

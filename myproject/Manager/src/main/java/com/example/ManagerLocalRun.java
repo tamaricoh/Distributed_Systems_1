@@ -10,11 +10,11 @@ public class ManagerLocalRun implements Runnable {
 
     private static final String LOCALAPP_TO_MANAGER_QUEUE_NAME = "localapp-to-manager";
     private static final String MANAGER_TO_WORKERS_QUEUE_NAME = "manager-to-workers";
-    private static final String WORKERS_TO_MANAGER_QUEUE_NAME = "worker-to-manager";
+    private static final String WORKERS_TO_MANAGER_QUEUE_NAME = "workers-to-manager";
     private static String SQS_READY = "manager-to-localapp";
     // private static final String LOCALAPP_TO_MANAGER_BUCKET_NAME = "LocalApp-To-Manager";
-    private static String CLIENT_BUCKET = "text-file-bucket";
-    private static String EC2_BUCKET = "jar-bucket";
+    private static String CLIENT_BUCKET = "text-file-bucket-101";
+    private static String EC2_BUCKET = "jar-bucket-101";
     private static String WORKER_JAR = "/home/ec2-user/worker.jar";
     
     static AWSManeger aws = AWSManeger.getInstance();
@@ -28,7 +28,7 @@ public class ManagerLocalRun implements Runnable {
 
     @Override
     public void run() {
-        aws.sendSQSMessage("Tamar", "test");
+        aws.sendSQSMessage("Tamar1", "test");
         while (!terminate) {
             String[] msg = aws.getMessage(LOCALAPP_TO_MANAGER_QUEUE_NAME);
             if (msg == null) {
@@ -38,11 +38,11 @@ public class ManagerLocalRun implements Runnable {
                 terminate();
                 break;
             }
-
+            System.err.println(msg[0]+ " " + msg[1]);
             String s3Location = msg[0];
             String linesPerWorkerStr = msg[1];
             int linesPerWorker = Integer.parseInt(linesPerWorkerStr);
-            String LocalAppID = s3Location;
+            String LocalAppID = String.valueOf(manager.addLocal());
 
             Path path = aws.downloadFileFromS3(s3Location, CLIENT_BUCKET);
             if (path != null) {
@@ -52,6 +52,7 @@ public class ManagerLocalRun implements Runnable {
                     if (active_workers > 0){
                         ManagerWorkerRun workerTask = new ManagerWorkerRun(active_workers, numOfTasks, LocalAppID, manager);
                         addClient(LocalAppID);
+                        System.out.println("TAMAR-1");
                         manager.submitTask(workerTask);
                     }
                     else{
@@ -73,13 +74,13 @@ public class ManagerLocalRun implements Runnable {
      * @param linesPerWorker The number of lines to be processed by each worker.
      */
     private int readFile(Path filePath, int linesPerWorker, String LocalAppID) {
-        aws.createSqsQueue(MANAGER_TO_WORKERS_QUEUE_NAME + LocalAppID);
-        aws.createSqsQueue(WORKERS_TO_MANAGER_QUEUE_NAME + LocalAppID);
+        aws.createSqsQueue(MANAGER_TO_WORKERS_QUEUE_NAME + "-" + LocalAppID);
+        aws.createSqsQueue(WORKERS_TO_MANAGER_QUEUE_NAME + "-" + LocalAppID);
         int numOfTasks = 0;
         try (BufferedReader reader = Files.newBufferedReader(filePath)) {
             String line;
             while ((line = reader.readLine()) != null) {
-                String[] parts = line.split(" ");
+                String[] parts = line.split("\t");
                 if (parts.length != 2) {
                     System.err.println("Invalid line format: " + line);
                     continue; // Skip malformed lines
@@ -90,7 +91,7 @@ public class ManagerLocalRun implements Runnable {
                 String message = parseMessage(operation, url);
 
                 // Send the message to the SQS queue
-                aws.sendSQSMessage(message, MANAGER_TO_WORKERS_QUEUE_NAME + LocalAppID);
+                aws.sendSQSMessage(message, MANAGER_TO_WORKERS_QUEUE_NAME + "-" + LocalAppID);
                 numOfTasks++;
             }
             return numOfTasks;
@@ -107,12 +108,12 @@ public class ManagerLocalRun implements Runnable {
      * @param LocalAppID     client identification for creating unique queues and buckets.
      */
     private int bootstrap(int numOfWorkers, String LocalAppID) {
-        aws.createBucketIfNotExists("la-"+LocalAppID);
+        aws.createBucketIfNotExists("la-" + LocalAppID + "-101");
         
         if (manager.getAvailableWorkers() > 0 && numOfWorkers > 0){
             numOfWorkers = Math.min(numOfWorkers, manager.getAvailableWorkers());
             manager.availableWorkers.addAndGet(-numOfWorkers);
-            initializeWorker("la-"+LocalAppID, "worker-"+LocalAppID, numOfWorkers, LocalAppID);
+            initializeWorker("la-" + LocalAppID + "-101", "worker-"+LocalAppID, numOfWorkers, LocalAppID);
          }
          else {
             return 0;
