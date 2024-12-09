@@ -100,8 +100,8 @@ public class AWS {
                 .imageId(ami)
                 .maxCount(numberOfInstances)
                 .minCount(1)
-                // .keyName("vockey")
-                .keyName("Test")
+                .keyName("vockey")
+                // .keyName("Test")
                 .iamInstanceProfile(IamInstanceProfileSpecification.builder().name("LabInstanceProfile").build())
                 .userData(Base64.getEncoder().encodeToString((script).getBytes()))
                 .build();
@@ -136,7 +136,7 @@ public class AWS {
      */
     public boolean isManagerInstanceRunning() {
         try {
-                Thread.sleep(6000);
+                Thread.sleep(15000);
         } catch (InterruptedException e) {
                 e.printStackTrace();
         }
@@ -412,7 +412,7 @@ public String uploadJar(String filePath, String bucketName) {
 
         // Execute the JAR
         "echo \"Running the Manager application...\"",
-        // "java -jar ./manager.jar > $WORK_DIR/app.log 2>&1 &", // Run the shaded JAR ///TAMAR
+        "java -jar ./manager.jar > $WORK_DIR/app.log 2>&1 &", // Run the shaded JAR ///TAMAR
         "echo \"Manager setup complete\""
     );
         return script;

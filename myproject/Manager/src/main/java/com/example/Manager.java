@@ -12,7 +12,7 @@ import java.util.concurrent.Semaphore;
 
 public class Manager {
 
-    public final int MAX_WORKERS = 14;
+    public final int MAX_WORKERS = 8;
     private static final int THREAD_POOL_SIZE = 5;
     public ExecutorService threadPool;
     public AtomicInteger availableWorkers = new AtomicInteger(MAX_WORKERS);
@@ -27,8 +27,8 @@ public class Manager {
     }
 
     public int addLocal(){
-        locals++;
-        return locals--;
+        this.locals++;
+        return locals-1;
     }
 
     

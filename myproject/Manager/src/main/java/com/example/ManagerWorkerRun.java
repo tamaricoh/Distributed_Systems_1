@@ -104,7 +104,7 @@ public class ManagerWorkerRun implements Runnable {
         aws.deleteQueue(MANAGER_TO_WORKERS_QUEUE_NAME + "-" + localAppID);
         aws.deleteQueue(WORKERS_TO_MANAGER_QUEUE_NAME + "-" + localAppID);
         if(delete_bucket){
-            aws.deleteBucket("la-" + localAppID + "-101");
+            aws.deleteBucket("localapp-" + localAppID);
         }
         terminate = true;   
     }

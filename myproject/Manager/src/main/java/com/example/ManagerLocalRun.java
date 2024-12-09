@@ -108,12 +108,15 @@ public class ManagerLocalRun implements Runnable {
      * @param LocalAppID     client identification for creating unique queues and buckets.
      */
     private int bootstrap(int numOfWorkers, String LocalAppID) {
-        aws.createBucketIfNotExists("la-" + LocalAppID + "-101");
+        aws.createBucketIfNotExists("localapp-" + LocalAppID);
         
         if (manager.getAvailableWorkers() > 0 && numOfWorkers > 0){
             numOfWorkers = Math.min(numOfWorkers, manager.getAvailableWorkers());
             manager.availableWorkers.addAndGet(-numOfWorkers);
-            initializeWorker("la-" + LocalAppID + "-101", "worker-"+LocalAppID, numOfWorkers, LocalAppID);
+            System.out.println("TAMAR " + numOfWorkers);
+            for (int i = 0 ; i < numOfWorkers; i++){
+                initializeWorker("localapp-" + LocalAppID, "worker-"+LocalAppID, 1, LocalAppID);
+            }
          }
          else {
             return 0;
