@@ -2,6 +2,8 @@ package com.example;
 
 import java.io.*;
 // import java.net.*;
+import java.nio.file.Paths;
+import java.net.URI;
 
 import software.amazon.awssdk.services.sqs.model.Message;
 
@@ -28,9 +30,11 @@ public class Worker{
     public void startWorker() {
         while(!this.terminate){
             Message msg = aws.getMessage(MANAGER_TO_WORKERS_QUEUE);
+            // String msg = "ToImage http://www.bethelnewton.org/images/Passover_Guide_BOOKLET.pdf";
             if (msg != null){
                 try{
                     String task = msg.body();
+                    // String task = msg;
                     if (task.contentEquals("terminate")) {
                         terminate = true;  // Set terminate flag to true to break the loop
                         aws.sendMessage(WORKERS_TO_MANAGER_QUEUE, "terminting");
@@ -42,6 +46,7 @@ public class Worker{
 
                     String newURL = processFile(operation, url);
                     if (!newURL.contains("Error:")){
+                        newURL = Paths.get(new URI(newURL)).toString();
                         newURL = aws.uploadFileToS3(newURL, CLIENT_BUCKET);
                         File file = new File(newURL);
                         if (file.exists()) file.delete();
