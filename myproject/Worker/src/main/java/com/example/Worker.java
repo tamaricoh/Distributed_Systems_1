@@ -8,36 +8,32 @@ import software.amazon.awssdk.services.sqs.model.Message;
 
 public class Worker{
 
-    private static final String MANAGER_TO_WORKERS_QUEUE = "manager_to_workers";
-    private static final String CLIENT_BUCKET = "la-";
-    private static final String WORKERS_TO_MANAGER_QUEUE = "workers_to_manager";
-
-    // String linesPerWorker = System.getenv("LINES_PER_WORKER");
-    static String localAppID = System.getenv("LOCAL_APP_ID");
-
-
-    static AWS aws = AWS.getInstance();
+    private static String MANAGER_TO_WORKERS_QUEUE = "manager_to_workers";
+    private static String CLIENT_BUCKET = "la-";
+    private static String WORKERS_TO_MANAGER_QUEUE = "workers_to_manager";
+    static String localAppID;
     public Boolean terminate;
+    static AWS aws = AWS.getInstance();
 
     // Constructor
-    public Worker() {
+    public Worker(String LocalAppId) {
+        localAppID = LocalAppId;
+        MANAGER_TO_WORKERS_QUEUE = MANAGER_TO_WORKERS_QUEUE + LocalAppId;
+        WORKERS_TO_MANAGER_QUEUE = WORKERS_TO_MANAGER_QUEUE + LocalAppId;
+        CLIENT_BUCKET = CLIENT_BUCKET + LocalAppId;
         this.terminate = false;
-    }
-
-    public static String getName(String bucketName){
-        return bucketName + localAppID;
     }
 
     // @Override
     public void startWorker() {
         while(!this.terminate){
-            Message msg = aws.getMessage(getName(MANAGER_TO_WORKERS_QUEUE));
+            Message msg = aws.getMessage(MANAGER_TO_WORKERS_QUEUE);
             if (msg != null){
                 try{
                     String task = msg.body();
                     if (task.contentEquals("terminate")) {
                         terminate = true;  // Set terminate flag to true to break the loop
-                        aws.sendMessage(getName(WORKERS_TO_MANAGER_QUEUE), "terminting");
+                        aws.sendMessage(WORKERS_TO_MANAGER_QUEUE, "terminting");
                         aws.shutdown();
                     }
                     String[] parts = task.split(" ");
@@ -46,12 +42,12 @@ public class Worker{
 
                     String newURL = processFile(operation, url);
                     if (!newURL.contains("Error:")){
-                        newURL = aws.uploadFileToS3(newURL, getName(CLIENT_BUCKET));
+                        newURL = aws.uploadFileToS3(newURL, CLIENT_BUCKET);
                         File file = new File(newURL);
                         if (file.exists()) file.delete();
                     }
-                    aws.sendMessage(getName(WORKERS_TO_MANAGER_QUEUE), operation + " " + url + " " + newURL);
-                    aws.deleteMessage(getName(MANAGER_TO_WORKERS_QUEUE), msg.receiptHandle());
+                    aws.sendMessage(WORKERS_TO_MANAGER_QUEUE, operation + " " + url + " " + newURL);
+                    aws.deleteMessage(MANAGER_TO_WORKERS_QUEUE, msg.receiptHandle());
                 } catch (Exception e) {
                     System.err.println("Error while processing the task: " + e.getMessage());  
                 }
@@ -71,10 +67,9 @@ public class Worker{
     }
 
     public static void main(String[] args){
-        Worker worker = new Worker();
+        Worker worker = new Worker(args[0]);
         worker.startWorker();
-        aws.sendMessage(getName(WORKERS_TO_MANAGER_QUEUE), "terminating");
+        aws.sendMessage(WORKERS_TO_MANAGER_QUEUE, "terminating");
         aws.shutdown();
-        //shut down the EC2 instance()
     }
 }
