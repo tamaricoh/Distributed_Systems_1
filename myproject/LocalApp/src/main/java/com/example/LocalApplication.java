@@ -89,7 +89,6 @@ public class LocalApplication{
                 System.exit(0);
             }
             //message format - <file_location_s3>:::<lines_per_worker>
-            aws.sendSQSMessage("localapp-to-manager", "Tamar");
             String msg = file_key_S3 + dilimeter + n;
             aws.sendSQSMessage(SQS_CLIENT, msg);
             initalizeManager();
