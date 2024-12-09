@@ -412,7 +412,7 @@ public String uploadJar(String filePath, String bucketName) {
 
         // Execute the JAR
         "echo \"Running the Manager application...\"",
-        "java -jar ./manager.jar > $WORK_DIR/app.log 2>&1 &", // Run the shaded JAR ///TAMAR
+        "java -jar ./manager.jar " + worker_jar_key + " > $WORK_DIR/app.log 2>&1 &", // Run the shaded JAR ///TAMAR
         "echo \"Manager setup complete\""
     );
         return script;

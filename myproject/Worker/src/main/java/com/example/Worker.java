@@ -8,9 +8,9 @@ import software.amazon.awssdk.services.sqs.model.Message;
 
 public class Worker{
 
-    private static String MANAGER_TO_WORKERS_QUEUE = "manager_to_workers";
-    private static String CLIENT_BUCKET = "la-";
-    private static String WORKERS_TO_MANAGER_QUEUE = "workers_to_manager";
+    private static String MANAGER_TO_WORKERS_QUEUE = "manager-to-workers-";
+    private static String CLIENT_BUCKET = "localapp-";
+    private static String WORKERS_TO_MANAGER_QUEUE = "workers-to-manager-";
     static String localAppID;
     public Boolean terminate;
     static AWS aws = AWS.getInstance();

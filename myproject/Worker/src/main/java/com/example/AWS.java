@@ -35,7 +35,7 @@ public class AWS {
     private final Ec2Client ec2Client;
     private static final String INSTANCE_METADATA_URL = "http://169.254.169.254/latest/meta-data/instance-id";
     public static String ami = "ami-00e95a9222311e8ed";
-    private int WorkerVisibilityTimeout = 10;
+    private int WorkerVisibilityTimeout = 2;
     public static Region region1 = Region.US_WEST_2;
     public static Region region2 = Region.US_EAST_1;
     private static final AWS instance = new AWS();
@@ -86,6 +86,19 @@ public class AWS {
             return null;
         }
     }
+
+    public void sendSQSMessage(String message, String queueName) {
+        try{
+            SendMessageRequest sendMessageRequest = SendMessageRequest.builder()
+                .queueUrl(getQueueUrl(queueName))
+                .messageBody(message)
+                .build();
+                getInstance().sqsClient.sendMessage(sendMessageRequest);
+            System.err.println("Message from LocalApp sent to " + queueName + " queue: " + message);
+        }catch (SqsException e){
+                System.err.println("[DEBUG]: Error trying to send message to queue " + queueName + ", Error Message: " + e.awsErrorDetails().errorMessage());
+        }
+    }   
 
     /**
      * Deletes a message from the specified SQS queue.
