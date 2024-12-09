@@ -5,12 +5,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.List;
-// import java.util.ArrayList;
-// import java.io.BufferedReader;
-// import java.io.FileInputStream;
-// import java.io.FileReader;
-// import java.io.IOException;
-// import java.util.Properties;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.CreateTagsRequest;
 import software.amazon.awssdk.services.ec2.model.DescribeInstancesRequest;
@@ -43,8 +37,6 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SqsException;
-// import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-// import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.model.Tag;
 import software.amazon.awssdk.services.ec2.model.Filter;
@@ -55,19 +47,12 @@ public class AWS {
     public static String ami = "ami-00e95a9222311e8ed";
 
     public static Region region1 = Region.US_WEST_2;
-    // public static Region region1 = Region.US_EAST_1;
     public static Region region2 = Region.US_EAST_1;
-    // public static Region region2 = Region.US_WEST_2;
 
     private static final AWS instance = new AWS();
 
     // Constructor initializes S3, SQS, and EC2 clients with the default region.
     private AWS() {
-        // List<String> credentials = aws_credentials_loader();
-        // AwsBasicCredentials awsCreds = AwsBasicCredentials.create(credentials.get(0), credentials.get(1));
-        // s3 = S3Client.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
-        // sqs = SqsClient.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
-        // ec2 = Ec2Client.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
         s3 = S3Client.builder().region(region1).build();
         sqs = SqsClient.builder().region(region1).build();
         ec2 =  Ec2Client.builder().region(region2).build();
@@ -108,18 +93,7 @@ public class AWS {
         }
     }
 
-    /**
-     * Launches an EC2 instance with the specified script, tag, and number of instances.
-     *
-     * @param script           User-data script for the instance.
-     * @param tagName          Name tag for the instance.
-     * @param numberOfInstances Number of instances to launch.
-     * @return Instance ID of the first launched instance.
-     */
     public String createEC2(String script, String tagName, int numberOfInstances) {
-        
-        Ec2Client ec2 = Ec2Client.builder().region(region2).build();
-
         // Configure the instance launch request
         RunInstancesRequest runRequest = RunInstancesRequest.builder()
                 .instanceType(InstanceType.M4_LARGE)
@@ -130,11 +104,11 @@ public class AWS {
                 .iamInstanceProfile(IamInstanceProfileSpecification.builder().name("LabInstanceProfile").build())
                 .userData(Base64.getEncoder().encodeToString((script).getBytes()))
                 .build();
-
+    
         // Launch the instances
         RunInstancesResponse response = ec2.runInstances(runRequest);
         String instanceId = response.instances().get(0).instanceId();
-
+    
         // Tag the instance with the provided tag
         CreateTagsRequest tagRequest = CreateTagsRequest.builder()
                 .resources(instanceId)
@@ -143,7 +117,7 @@ public class AWS {
                         .value(tagName)
                         .build())
                 .build();
-
+    
         try {
             ec2.createTags(tagRequest);
             System.out.printf("[DEBUG] Successfully started EC2 instance %s based on AMI %s\n", instanceId, ami);
@@ -199,7 +173,6 @@ public class AWS {
                     }
                 }
             }
-        System.out.println("[DEBUG] No running Manager instance found.");
         return false;
     }
 
@@ -228,7 +201,6 @@ public class AWS {
                         .messageBody(message)
                         .build();
                         getInstance().sqs.sendMessage(sendMessageRequest);
-                System.err.println("Message from LocalApp sent to " + queueName + " queue: " + message);
         }catch (SqsException e){
                 System.err.println("[DEBUG]: Error trying to send message to queue " + queueName + ", Error Message: " + e.awsErrorDetails().errorMessage());
         }
@@ -415,20 +387,37 @@ public String uploadJar(String filePath, String bucketName) {
         return false; // File does not exist
     }
 
-    public String generateManagerUserDataScript(String bucketName, String jarFilePath, String workerJarPath) {
+    public String generateManagerUserDataScript(String bucketName, String jar_key, String worker_jar_key) {
         String script = String.join("\n",
-            "#!/bin/bash",
-            // "sudo yum update -y",
-            "sudo yum install -y java-1.8.0-openjdk", // Install Java if needed
-            "mkdir -p /home/ec2-user",               // Ensure directory exists
-            "aws s3 cp s3://" + bucketName + "/" + jarFilePath + " /home/ec2-user/" + jarFilePath, 
-            // "aws s3 cp " + jarFilePath + " /home/ec2-user/" + jarFilePath, 
-            "aws s3 cp s3://" + bucketName + "/" + workerJarPath + " /home/ec2-user/" + workerJarPath,
-            // "aws s3 cp " + workerJarPath + " /home/ec2-user/" + workerJarPath,
-            "java -jar /home/ec2-user/"+ jarFilePath // Run the manager JAR
-        );
+        "#!/bin/bash",
+        "set -e", // Exit immediately if a command exits with a non-zero status
+        "LOG_FILE=/var/log/manager-setup.log",
+        "exec > >(tee -a $LOG_FILE) 2>&1", // Redirect all output to log file
+        "echo \"Starting EC2 setup\"",
+
+        // Install necessary software
+        "sudo yum update -y",
+        "sudo yum install -y java-1.8.0-openjdk",
+        "sudo yum install -y aws-cli",
+
+        // Prepare the working directory
+        "WORK_DIR=/home/ec2-user/manager",
+        "mkdir -p $WORK_DIR",
+        "cd $WORK_DIR",
+
+        // Download the JAR file
+        "echo \"Downloading JAR file from S3...\"",
+        "aws s3 cp s3://" + bucketName + "/" + jar_key + " ./manager.jar",
+
+        // Execute the JAR
+        "echo \"Running the Manager application...\"",
+        "java -jar ./manager.jar > $WORK_DIR/app.log 2>&1 &", // Run the shaded JAR
+        "echo \"Manager setup complete\""
+    );
         return script;
     }
+
+    
     
 
 }
