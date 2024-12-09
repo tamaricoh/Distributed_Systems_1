@@ -20,10 +20,12 @@ public class Manager {
     private final Semaphore machineSem = new Semaphore(1);
     static AWSManeger aws = AWSManeger.getInstance();
     public int locals = 0;
+    public String WORKER_JAR;
 
-    public Manager() {
+    public Manager(String jar) {
         // Initialize the thread pool with a fixed size of 5
         threadPool = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+        WORKER_JAR = jar;
     }
 
     public int addLocal(){
@@ -102,7 +104,7 @@ public class Manager {
     }
 
     public static void main(String[] args) {
-        Manager manager = new Manager();  // Create Manager instance with thread pool
+        Manager manager = new Manager(args[0]);  // Create Manager instance with thread pool
         
         // Create and start the localAppThread (which will run ManagerLocalRun)
         Thread localAppThread = new Thread(new ManagerLocalRun(manager));

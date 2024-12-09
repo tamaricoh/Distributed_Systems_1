@@ -15,7 +15,7 @@ public class ManagerLocalRun implements Runnable {
     // private static final String LOCALAPP_TO_MANAGER_BUCKET_NAME = "LocalApp-To-Manager";
     private static String CLIENT_BUCKET = "text-file-bucket-101";
     private static String EC2_BUCKET = "jar-bucket-101";
-    private static String WORKER_JAR = "/home/ec2-user/worker.jar";
+    private static String WORKER_JAR;
     
     static AWSManeger aws = AWSManeger.getInstance();
     private Boolean terminate;
@@ -24,11 +24,11 @@ public class ManagerLocalRun implements Runnable {
     public ManagerLocalRun(Manager manager1) {
         terminate = false;
         manager = manager1;
+        WORKER_JAR = manager1.WORKER_JAR;
     }
 
     @Override
     public void run() {
-        aws.sendSQSMessage("Tamar1", "test");
         while (!terminate) {
             String[] msg = aws.getMessage(LOCALAPP_TO_MANAGER_QUEUE_NAME);
             if (msg == null) {
@@ -127,7 +127,7 @@ public class ManagerLocalRun implements Runnable {
 
     private static void initializeWorker(String BUCKET_NAME, String tag, int num, String LocalAppID){
         aws.checkIfFileExistsInS3(EC2_BUCKET, WORKER_JAR);
-        String workerDataScript = aws.generateWorkerDataScript(BUCKET_NAME, WORKER_JAR, LocalAppID);
+        String workerDataScript = aws.generateWorkerDataScript(EC2_BUCKET, WORKER_JAR, LocalAppID);
         aws.createEC2(workerDataScript, tag, num);
     }
 

@@ -256,7 +256,8 @@ public class AWSManeger {
                 .imageId(ami)
                 .maxCount(numberOfInstances)
                 .minCount(1)
-                .keyName("vockey")
+                // .keyName("vockey")
+                .keyName("Test")
                 .iamInstanceProfile(IamInstanceProfileSpecification.builder().name("LabInstanceProfile").build())
                 .userData(Base64.getEncoder().encodeToString((script).getBytes()))
                 .build();
