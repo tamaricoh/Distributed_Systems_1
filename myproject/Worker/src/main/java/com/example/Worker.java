@@ -13,7 +13,7 @@ public class Worker{
     private static final String WORKERS_TO_MANAGER_QUEUE = "workers_to_manager";
 
     // String linesPerWorker = System.getenv("LINES_PER_WORKER");
-    String localAppID = System.getenv("LOCAL_APP_ID");
+    static String localAppID = System.getenv("LOCAL_APP_ID");
 
 
     static AWS aws = AWS.getInstance();
@@ -24,7 +24,7 @@ public class Worker{
         this.terminate = false;
     }
 
-    private String getName(String bucketName){
+    public static String getName(String bucketName){
         return bucketName + localAppID;
     }
 
@@ -73,6 +73,7 @@ public class Worker{
     public static void main(String[] args){
         Worker worker = new Worker();
         worker.startWorker();
+        aws.sendMessage(getName(WORKERS_TO_MANAGER_QUEUE), "terminating");
         aws.shutdown();
         //shut down the EC2 instance()
     }

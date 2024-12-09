@@ -34,22 +34,17 @@ public class AWS {
     private final SqsClient sqsClient;
     private final Ec2Client ec2Client;
     private static final String INSTANCE_METADATA_URL = "http://169.254.169.254/latest/meta-data/instance-id";
-
     public static String ami = "ami-00e95a9222311e8ed";
     private int WorkerVisibilityTimeout = 10;
-
     public static Region region1 = Region.US_WEST_2;
     public static Region region2 = Region.US_EAST_1;
-
     private static final AWS instance = new AWS();
 
     // Constructor initializes S3, SQS, and EC2 clients with the default region.
     private AWS() {
-        String[] credentials = aws_credentials_loader();
-        AwsBasicCredentials awsCreds = AwsBasicCredentials.create(credentials[0], credentials[1]);
-        s3Client = S3Client.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
-        sqsClient = SqsClient.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
-        ec2Client = Ec2Client.builder().credentialsProvider(StaticCredentialsProvider.create(awsCreds)).region(region1).build();
+        s3Client = S3Client.builder().region(region1).build();
+        sqsClient = SqsClient.builder().region(region1).build();
+        ec2Client =  Ec2Client.builder().region(region2).build();
     }
 
     /**
@@ -59,30 +54,6 @@ public class AWS {
      */
     public static AWS getInstance() {
         return instance;
-    }
-
-    private static String[] aws_credentials_loader() {
-        // Specify the file path
-        String credentialsFilePath = "aws_credinatials.txt";
-
-        // Load the properties file
-         // Initialize variables to store credentials
-        String[] creds = new String[2];
-
-        // Read the file line by line
-        try (BufferedReader reader = new BufferedReader(new FileReader(credentialsFilePath))) {
-            String line;
-            int i = 0;
-            while ((line = reader.readLine()) != null) {
-                // Split each line at the '=' character
-                String[] parts = line.split("=", 2);
-                creds[i] = parts[1];
-                i++;
-            }
-        } catch (IOException e) {
-            System.err.println("Error reading credentials file: " + e.getMessage());
-        }
-        return creds;
     }
 
     /**
@@ -148,7 +119,7 @@ public class AWS {
                 .messageBody(message)
                 .build();
                 getInstance().sqsClient.sendMessage(sendMessageRequest);
-            System.err.println("Message from LocalApp sent to " + queueName + " queue: " + message);
+            System.err.println("Message from Worker sent to " + queueName + " queue: " + message);
         }catch (SqsException e){
                 System.err.println("[DEBUG]: Error trying to send message to queue " + queueName + ", Error Message: " + e.awsErrorDetails().errorMessage());
         }
@@ -195,7 +166,6 @@ public class AWS {
             return null;
         }
     }
-    //TODO::implement shutdown() which is supposed to shut off the ec2 machine....
     
     public void shutdown() {
         String instanceId = getInstanceId();
@@ -212,6 +182,7 @@ public class AWS {
             );
         } catch (Exception e) {
             System.err.println("Failed to terminate instance: " + e.getMessage());
+            
         }
     }
 
