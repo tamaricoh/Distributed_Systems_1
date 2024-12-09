@@ -15,10 +15,10 @@ This Maven-based project consists of three independent modules:
      The Manager utilizes a thread pool to handle multiple LocalApp requests concurrently. One thread continuously polls the SQS queue for new messages, while others manage the coordination between the Manager and Workers for each specific request.
    - **Communication**:
      - Between **LocalApp and Manager**: A shared SQS queue is used for message passing. (Currently, two queues are used; the future plan is to consolidate them into one queue.)
-     - Between **Manager and Workers**: Each LocalApp request spawns its own communication channels via dedicated SQS queues (currently two queues per request, with plans to reduce this to one).
+     - Between **Manager and Workers**: Each LocalApp request spawns its own communication channels via dedicated SQS queues. (currently two queues per request, with plans to reduce this to one or even one for many clients.)
 
 3. **Worker**  
-   The processing units that handle tasks delegated by the Manager. Workers receive a task and a URL pointing to a file on S3. They perform the specified task (e.g., converting a PDF to a text file, HTML, or PNG), upload the resulting file to S3, and send the new URL back to the Manager.
+   The processing units that handle tasks delegated by the Manager. Workers receive a task and a URL pointing to a file on S3. They perform the specified task (e.g., converting a PDF to a text file, HTML, or PNG), upload the resulting file to S3, and send the new URL back to the Manager. Each worker runs from an Ec2 instance and has the responsibilty to shutdown when he finishes his 
 
 ---
 
