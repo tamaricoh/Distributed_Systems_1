@@ -12,7 +12,6 @@ public class ManagerLocalRun implements Runnable {
     private static final String MANAGER_TO_WORKERS_QUEUE_NAME = NamingConvention.MANAGER_TO_WORKERS_SQS;
     private static final String WORKERS_TO_MANAGER_QUEUE_NAME = NamingConvention.WORKERS_TO_MANAGER_SQS;
     private static String SQS_READY = NamingConvention.MANAGER_LOCAL_SQS;
-    // private static final String LOCALAPP_TO_MANAGER_BUCKET_NAME = "LocalApp-To-Manager";
     private static String CLIENT_BUCKET = NamingConvention.UPLOAD_FILE_BUCKET;
     private static String EC2_BUCKET = NamingConvention.JAR_BUCKET;
     private static String WORKER_JAR;
@@ -52,7 +51,6 @@ public class ManagerLocalRun implements Runnable {
                     if (active_workers > 0){
                         ManagerWorkerRun workerTask = new ManagerWorkerRun(active_workers, numOfTasks, LocalAppID, manager);
                         addClient(LocalAppID);
-                        System.out.println("TAMAR-1");
                         manager.submitTask(workerTask);
                     }
                     else{
@@ -74,8 +72,8 @@ public class ManagerLocalRun implements Runnable {
      * @param linesPerWorker The number of lines to be processed by each worker.
      */
     private int readFile(Path filePath, int linesPerWorker, String LocalAppID) {
-        aws.createSqsQueue(MANAGER_TO_WORKERS_QUEUE_NAME + "-" + LocalAppID);
-        aws.createSqsQueue(WORKERS_TO_MANAGER_QUEUE_NAME + "-" + LocalAppID);
+        aws.createSqsQueue(MANAGER_TO_WORKERS_QUEUE_NAME + LocalAppID);
+        aws.createSqsQueue(WORKERS_TO_MANAGER_QUEUE_NAME + LocalAppID);
         int numOfTasks = 0;
         try (BufferedReader reader = Files.newBufferedReader(filePath)) {
             String line;
@@ -91,7 +89,7 @@ public class ManagerLocalRun implements Runnable {
                 String message = parseMessage(operation, url);
 
                 // Send the message to the SQS queue
-                aws.sendSQSMessage(message, MANAGER_TO_WORKERS_QUEUE_NAME + "-" + LocalAppID);
+                aws.sendSQSMessage(message, MANAGER_TO_WORKERS_QUEUE_NAME + LocalAppID);
                 numOfTasks++;
             }
             return numOfTasks;

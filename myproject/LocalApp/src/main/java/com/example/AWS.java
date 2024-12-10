@@ -415,6 +415,7 @@ public String uploadJar(String filePath, String bucketName) {
         "java -jar ./manager.jar " + worker_jar_key + " > $WORK_DIR/app.log 2>&1 &", // Run the shaded JAR ///TAMAR
         "echo \"Manager setup complete\""
     );
+    System.out.println("worker jar key: " + worker_jar_key);
         return script;
     }
 

@@ -153,18 +153,18 @@ public class AWS {
 
     public String uploadFileToS3(String input_file_path, String bucketName) {
         String s3Key = Paths.get(input_file_path).getFileName().toString();
-
+    
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(bucketName)
                     .key(s3Key)
-                    .acl(ObjectCannedACL.PUBLIC_READ) // Make the object publicly readable
+                    .acl(ObjectCannedACL.PUBLIC_READ) // Explicitly set public read access
                     .build();
-
+    
             Path path = Paths.get(input_file_path);
             getInstance().s3Client.putObject(putObjectRequest, RequestBody.fromFile(path));
             System.out.println("File uploaded successfully to S3: " + s3Key);
-
+    
             // Return the public URL of the uploaded file
             return "https://" + bucketName + ".s3." + region1 + ".amazonaws.com/" + s3Key;
         } catch (Exception e) {

@@ -33,7 +33,6 @@ public class Worker{
             if (msg != null){
                 try{
                     String task = msg.body();
-                    // String task = msg;
                     if (task.contentEquals("terminate")) {
                         terminate = true;  // Set terminate flag to true to break the loop
                         aws.sendMessage(WORKERS_TO_MANAGER_QUEUE, "terminting");
@@ -57,6 +56,7 @@ public class Worker{
                         output_URL = processed_file_path;
                     }
                     aws.sendMessage(WORKERS_TO_MANAGER_QUEUE, operation + " " + url + " " + output_URL);
+                    aws.sendMessage(NamingConvention.SQS_TEST,"worker sent: " + operation + " " + url + " " + output_URL + "to worker manager");
                     aws.deleteMessage(MANAGER_TO_WORKERS_QUEUE, msg.receiptHandle());
                 } catch (Exception e) {
                     System.err.println("Error while processing the task: " + e.getMessage());  
@@ -97,6 +97,7 @@ public class Worker{
 
     public static void main(String[] args){
         Worker worker = new Worker(args[0]);
+        aws.sendMessage(NamingConvention.SQS_TEST, "worker running on ec2...");
         worker.startWorker();
         aws.sendMessage(WORKERS_TO_MANAGER_QUEUE, "terminating");
         aws.shutdown();
