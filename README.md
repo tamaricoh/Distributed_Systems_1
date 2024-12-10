@@ -117,6 +117,8 @@ Further improvements, such as dynamically scaling EC2 instances or redistributin
 
   If the Manager node dies, the LocalApp would detect the failure (e.g., via timeout mechanisms). It would then create a new Manager EC2 instance. The new Manager would check the **Just In Case queue** for any unprocessed or incomplete jobs and resume processing them. This ensures the system can recover and continue its operation even after the Manager fails.
 
+  While we didn’t have the time to fully implement this solution, it was part of our planned design. Ultimately, setting up the project as it stands took more time than we anticipated, and we preferred to deliver a project that performs its core functions, even if not optimally, rather than delay the submission.
+
 - **If a Worker node dies:**  
    This is less critical, thanks to the **visibility timeout** mechanism of SQS. When a Worker picks up a task but fails to complete it (e.g., due to a crash or disconnection), the task message becomes visible again in the **toWorker queue** after the timeout period. Another Worker can then pick up the task and complete it, ensuring no task is left unprocessed.
 
