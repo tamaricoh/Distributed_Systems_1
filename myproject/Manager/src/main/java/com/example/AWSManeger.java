@@ -13,7 +13,6 @@ import java.util.Base64;
 import java.util.List;
 
 import software.amazon.awssdk.core.ResponseInputStream;
-import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.CreateTagsRequest;
@@ -49,8 +48,7 @@ import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SqsException;
-import software.amazon.awssdk.services.sqs.model.Message;
-import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
+
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
 
 public class AWSManeger {
@@ -256,8 +254,8 @@ public class AWSManeger {
                 .imageId(ami)
                 .maxCount(numberOfInstances)
                 .minCount(1)
-                // .keyName("vockey")
-                .keyName("Test")
+                .keyName("vockey")
+                //.keyName("Test")
                 .iamInstanceProfile(IamInstanceProfileSpecification.builder().name("LabInstanceProfile").build())
                 .userData(Base64.getEncoder().encodeToString((script).getBytes()))
                 .build();
@@ -309,7 +307,7 @@ public class AWSManeger {
     
             // Execute the JAR with LocalAppID as an argument
             "echo \"Running the Worker application...\"",
-            // "java -jar ./worker.jar " + localAppId + " > $WORK_DIR/app.log 2>&1 &", // Pass LocalAppID to the JAR // TAMAR
+            "java -jar ./worker.jar " + localAppId + " > $WORK_DIR/app.log 2>&1 &", // Pass LocalAppID to the JAR // TAMAR
     
             "echo \"Worker setup complete\""
         );

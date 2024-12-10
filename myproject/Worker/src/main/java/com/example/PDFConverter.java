@@ -50,9 +50,9 @@ public class PDFConverter {
         }
     }
 
-    public static String convertFromUrl(String url, String operation, String localAppID) throws IOException {
+    public static String convertFromUrl(String url, String operation, String localAppID, String file_location) throws IOException {
         // Generate a destination file name based on URL and localAppID
-        String destinationFile = generateFileName(url, localAppID);
+        String destinationFile = file_location + "/" + generateFileName(url, localAppID);
     
         // First, download the file
         String downloadResult = downloadFile(url, destinationFile);
@@ -84,7 +84,11 @@ public class PDFConverter {
             }
     
             // Return the URL of the output file (successful case)
-            return new File(outputPath).toURI().toString();
+            File file = new File(destinationFile);
+            if (file.exists()) {
+                file.delete();
+            }
+            return outputPath;
     
         } catch (IOException e) {
             // Return an error message if conversion fails
@@ -135,7 +139,7 @@ public class PDFConverter {
         } catch (MalformedURLException e) {
             return "Error: Invalid URL format. " + e.getMessage();
         } catch (IOException e) {
-            return "Error: Unable to download file. " + url + " === " + destinationFile + "====" +e.getMessage();
+            return "Error: Unable to download file. " + e.getMessage();
         }
     }
 }

@@ -8,10 +8,10 @@ import java.nio.file.Paths;
 
 public class ManagerWorkerRun implements Runnable {
 
-    private static final String WORKERS_TO_MANAGER_QUEUE_NAME = "workers-to-manager";
-    private static final String MANAGER_TO_LOCALAPP_QUEUE_NAME = "manager-to-localapp";
-    private static final String MANAGER_TO_WORKERS_QUEUE_NAME = "manager_to_workers";
-    private static String CLIENT_BUCKET = "text-file-bucket";
+    private static final String WORKERS_TO_MANAGER_QUEUE_NAME = NamingConvention.WORKERS_TO_MANAGER_SQS;
+    private static final String MANAGER_TO_LOCALAPP_QUEUE_NAME = NamingConvention.MANAGER_LOCAL_SQS;
+    private static final String MANAGER_TO_WORKERS_QUEUE_NAME = NamingConvention.MANAGER_TO_WORKERS_SQS;
+    private static String CLIENT_BUCKET = NamingConvention.UPLOAD_FILE_BUCKET;
 
     static AWSManeger aws = AWSManeger.getInstance();
     private Manager manager;

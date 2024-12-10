@@ -8,13 +8,13 @@ import java.util.LinkedList;
 
 public class ManagerLocalRun implements Runnable {
 
-    private static final String LOCALAPP_TO_MANAGER_QUEUE_NAME = "localapp-to-manager";
-    private static final String MANAGER_TO_WORKERS_QUEUE_NAME = "manager-to-workers";
-    private static final String WORKERS_TO_MANAGER_QUEUE_NAME = "workers-to-manager";
-    private static String SQS_READY = "manager-to-localapp";
+    private static final String LOCALAPP_TO_MANAGER_QUEUE_NAME = NamingConvention.LOCAL_MANAGER_SQS;
+    private static final String MANAGER_TO_WORKERS_QUEUE_NAME = NamingConvention.MANAGER_TO_WORKERS_SQS;
+    private static final String WORKERS_TO_MANAGER_QUEUE_NAME = NamingConvention.WORKERS_TO_MANAGER_SQS;
+    private static String SQS_READY = NamingConvention.MANAGER_LOCAL_SQS;
     // private static final String LOCALAPP_TO_MANAGER_BUCKET_NAME = "LocalApp-To-Manager";
-    private static String CLIENT_BUCKET = "text-file-bucket-101";
-    private static String EC2_BUCKET = "jar-bucket-101";
+    private static String CLIENT_BUCKET = NamingConvention.UPLOAD_FILE_BUCKET;
+    private static String EC2_BUCKET = NamingConvention.JAR_BUCKET;
     private static String WORKER_JAR;
     
     static AWSManeger aws = AWSManeger.getInstance();
@@ -108,14 +108,14 @@ public class ManagerLocalRun implements Runnable {
      * @param LocalAppID     client identification for creating unique queues and buckets.
      */
     private int bootstrap(int numOfWorkers, String LocalAppID) {
-        aws.createBucketIfNotExists("localapp-" + LocalAppID);
+        aws.createBucketIfNotExists(NamingConvention.BASE_CLIENT_BUCKET + LocalAppID);
         
         if (manager.getAvailableWorkers() > 0 && numOfWorkers > 0){
             numOfWorkers = Math.min(numOfWorkers, manager.getAvailableWorkers());
             manager.availableWorkers.addAndGet(-numOfWorkers);
             System.out.println("TAMAR " + numOfWorkers);
             for (int i = 0 ; i < numOfWorkers; i++){
-                initializeWorker("localapp-" + LocalAppID, "worker-"+LocalAppID, 1, LocalAppID);
+                initializeWorker("worker-"+LocalAppID, 1, LocalAppID);
             }
          }
          else {
@@ -125,7 +125,7 @@ public class ManagerLocalRun implements Runnable {
     }
 
 
-    private static void initializeWorker(String BUCKET_NAME, String tag, int num, String LocalAppID){
+    private static void initializeWorker(String tag, int num, String LocalAppID){
         aws.checkIfFileExistsInS3(EC2_BUCKET, WORKER_JAR);
         String workerDataScript = aws.generateWorkerDataScript(EC2_BUCKET, WORKER_JAR, LocalAppID);
         aws.createEC2(workerDataScript, tag, num);
