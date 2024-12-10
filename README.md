@@ -113,7 +113,7 @@ Further improvements, such as dynamically scaling EC2 instances or redistributin
 ### Persistence – What if an EC2 node dies?
 
 - **If the Manager dies:**  
-   Boo hoo, the system would lose its central controller, and the operation would halt. However, we have a potential solution: implementing a **"Just In Case" queue.** This queue would store all messages received from the LocalApp that the Manager has started processing but not yet completed.
+   Boo hoo, the system would lose its central controller, and the operation would halt. However, we have considered a potential solution: implementing a **"Just In Case" queue.** This queue would store all messages received from the LocalApp that the Manager has started processing but not yet completed.
 
   If the Manager node dies, the LocalApp would detect the failure (e.g., via timeout mechanisms). It would then create a new Manager EC2 instance. The new Manager would check the **Just In Case queue** for any unprocessed or incomplete jobs and resume processing them. This ensures the system can recover and continue its operation even after the Manager fails.
 
