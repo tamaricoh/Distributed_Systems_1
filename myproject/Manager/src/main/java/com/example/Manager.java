@@ -44,10 +44,12 @@ public class Manager {
 
     // Submit tasks to the thread pool
     public void submitTask(Runnable task) {
+        System.out.println("[YARDEN] submitting a new task to thread pull");
         this.threadPool.submit(task);
     }
 
     public int getAvailableWorkers() {
+        System.out.println("[YARDEN] getting avilable workers");
         return availableWorkers.get();
     }
 
@@ -108,14 +110,15 @@ public class Manager {
         Manager manager = new Manager(args[0]);  // Create Manager instance with thread pool
         
         // Create and start the localAppThread (which will run ManagerLocalRun)
-        //Thread localAppThread = new Thread(new ManagerLocalRun(manager));
-        //localAppThread.start();
+        Thread localAppThread = new Thread(new ManagerLocalRun(manager));
+        localAppThread.start();
 
-        try {
+       /*  """try {
             // Create an instance of ManagerLocalRun
             ManagerLocalRun managerTask = new ManagerLocalRun(manager);
 
             // Submit the ManagerLocalRun instance to the thread pool
+            System.out.println("[YARDEN] submitting LocalManager");
             manager.threadPool.submit(managerTask);
 
             // Ensure all threads complete
@@ -132,6 +135,6 @@ public class Manager {
             System.err.println("Main thread interrupted while waiting for thread pool termination.");
             manager.threadPool.shutdownNow(); // Force shutdown in case of interruption
             manager.shutdown();
-        }
+        }"""*/
     }
 }

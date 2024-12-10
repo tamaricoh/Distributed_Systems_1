@@ -6,6 +6,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedList;
 
+import software.amazon.awssdk.services.sqs.model.Message;
+
 public class ManagerLocalRun implements Runnable {
 
     private static final String LOCALAPP_TO_MANAGER_QUEUE_NAME = NamingConvention.LOCAL_MANAGER_SQS;
@@ -29,18 +31,20 @@ public class ManagerLocalRun implements Runnable {
     @Override
     public void run() {
         while (!terminate) {
-            String[] msg = aws.getMessage(LOCALAPP_TO_MANAGER_QUEUE_NAME);
+            Message msg= aws.getMessage(LOCALAPP_TO_MANAGER_QUEUE_NAME);
             if (msg == null) {
-                continue; // Skip if no valid message is received
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {continue;}
             }
-            if (msg.length == 1 && msg[0] == "terminate"){
+            String message = msg.body();
+            if (message.contentEquals("terminate")){
                 terminate();
                 break;
             }
-            System.err.println(msg[0]+ " " + msg[1]);
-            String s3Location = msg[0];
-            String linesPerWorkerStr = msg[1];
-            int linesPerWorker = Integer.parseInt(linesPerWorkerStr);
+            String[] parts = message.split(" ");
+            String s3Location = parts[0];
+            int linesPerWorker = Integer.parseInt(parts[1]);
             String LocalAppID = String.valueOf(manager.addLocal());
 
             Path path = aws.downloadFileFromS3(s3Location, CLIENT_BUCKET);
@@ -48,16 +52,19 @@ public class ManagerLocalRun implements Runnable {
                 int numOfTasks = readFile(path, linesPerWorker, LocalAppID);
                 if (numOfTasks != -1){
                     int active_workers = bootstrap(numOfTasks/linesPerWorker, LocalAppID);
+                    System.out.println("[YARDEN] active workers count: " + active_workers);
                     if (active_workers > 0){
-                        ManagerWorkerRun workerTask = new ManagerWorkerRun(active_workers, numOfTasks, LocalAppID, manager);
+                        ManagerWorkerRun workerTask = new ManagerWorkerRun(active_workers, numOfTasks, LocalAppID, manager, s3Location);
                         addClient(LocalAppID);
                         manager.submitTask(workerTask);
                     }
                     else{
+                        System.out.println("[YARDEN] failed to hand out workers");
                         aws.sendSQSMessage(s3Location + " " + linesPerWorker, LOCALAPP_TO_MANAGER_QUEUE_NAME);
                     }
                 }
             }
+            aws.deleteMessage(LOCALAPP_TO_MANAGER_QUEUE_NAME, msg.receiptHandle());
         }
     }
 

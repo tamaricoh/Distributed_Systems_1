@@ -168,8 +168,7 @@ public class AWS {
             // Return the public URL of the uploaded file
             return "https://" + bucketName + ".s3." + region1 + ".amazonaws.com/" + s3Key;
         } catch (Exception e) {
-            System.err.println("Unexpected error during file upload: " + e.getMessage());
-            return null;
+            return "Error: Unexpected error during file upload " + e.getMessage();
         }
     }
     

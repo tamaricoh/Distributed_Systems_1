@@ -102,27 +102,6 @@ public class PDFConverter {
             return "Error: Unable to convert PDF to " + operation + ". Reason: " + e.getMessage();
         }
     }
-
-private static String performConversion(String operation, String destinationFile, String baseFileName) throws IOException {
-    String outputPath;
-    switch (operation.toUpperCase()) {
-        case "TOIMAGE":
-            outputPath = baseFileName + ".png";
-            convertToImage(destinationFile, outputPath);
-            break;
-        case "TOTEXT":
-            outputPath = baseFileName + ".txt";
-            convertToText(destinationFile, outputPath);
-            break;
-        case "TOHTML":
-            outputPath = baseFileName + ".html";
-            convertToHTML(destinationFile, outputPath);
-            break;
-        default:
-            throw new IllegalArgumentException("Unsupported operation: " + operation);
-    }
-    return outputPath;
-}
     
     /**
      * Generates a file name using the base name of the URL and localAppID.
