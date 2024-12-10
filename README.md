@@ -1,8 +1,6 @@
-Here’s the updated `README` file with the requested changes:
+# Distributed System Programming -
 
----
-
-# Distributed System Programming - Assignment 1
+## Assignment 1
 
 ### Authors:
 
