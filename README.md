@@ -1,6 +1,17 @@
+Here’s the updated `README` file with the requested changes:
+
+---
+
 # Distributed System Programming - Assignment 1
 
-This Maven-based project consists of three independent modules:
+### Authors:
+
+- **Yarden Greenpeter** - 318517653
+- **Tamar Cohen** - 315218073
+
+---
+
+## Project Overview
 
 1. **LocalApp**  
    The entry point for users. This application submits requests to the system via AWS SQS queues. It also handles the creation of an EC2 instance to run the Manager if it is not already running.
@@ -15,10 +26,10 @@ This Maven-based project consists of three independent modules:
      The Manager utilizes a thread pool to handle multiple LocalApp requests concurrently. One thread continuously polls the SQS queue for new messages, while others manage the coordination between the Manager and Workers for each specific request.
    - **Communication**:
      - Between **LocalApp and Manager**: A shared SQS queue is used for message passing. (Currently, two queues are used; the future plan is to consolidate them into one queue.)
-     - Between **Manager and Workers**: Each LocalApp request spawns its own communication channels via dedicated SQS queues. (currently two queues per request, with plans to reduce this to one or even one for many clients.)
+     - Between **Manager and Workers**: Each LocalApp request spawns its own communication channels via dedicated SQS queues. (Currently two queues per request, with plans to reduce this to one or even one for many clients.)
 
 3. **Worker**  
-   The processing units that handle tasks delegated by the Manager. Workers receive a task and a URL pointing to a file on S3. They perform the specified task (e.g., converting a PDF to a text file, HTML, or PNG), upload the resulting file to S3, and send the new URL back to the Manager. Each worker runs from an Ec2 instance and has the responsibilty to shutdown when he finishes his 
+   The processing units that handle tasks delegated by the Manager. Workers receive a task and a URL pointing to a file on S3. They perform the specified task (e.g., converting a PDF to a text file, HTML, or PNG), upload the resulting file to S3, and send the new URL back to the Manager. Each worker runs from an EC2 instance and has the responsibility to shut down when it finishes its task.
 
 ---
 
@@ -26,43 +37,101 @@ This Maven-based project consists of three independent modules:
 
 ### Pre-requisites
 
-1. **AWS Services Setup**:
+1. **Build the Maven Projects for Manager and Worker**:
 
-   - Ensure that the required AWS services (S3, SQS, EC2) are properly configured.
-   - Set up IAM roles and policies to allow the applications to interact with these services.
-
-2. **Build the Maven Projects**:
-   - Navigate to each module directory (`LocalApp`, `Manager`, `Worker`) and build the JAR files:
+   - Navigate to the directories for `Manager` and `Worker` modules and build the JAR files:
      ```bash
      mvn clean install
      ```
-   - This will generate executable JAR files in the `target` directory of each module.
+
+2. **Update `LocalApp.java` Variables**:  
+   Before building the `LocalApp` module, ensure the following variables are correctly updated in `LocalApp.java` with the appropriate paths to the JAR files for the Manager and Worker:
+
+   ```java
+   private static String MANAGER_JAR = "<path-to-manager-jar>";
+   private static String WORKER_JAR = "<path-to-worker-jar>";
+   ```
+
+   Replace `<path-to-manager-jar>` and `<path-to-worker-jar>` with the respective S3 paths or URLs where the JAR files are stored.
+
+3. **Build the Maven Project for LocalApp**:
+   - Navigate to the `LocalApp` module directory and build the JAR file:
+     ```bash
+     mvn clean install
+     ```
 
 ### Step-by-Step Execution
 
-1. **Run the LocalApp**:
+1. **Start the LocalApp**:
 
-   - Start the `LocalApp` module:
-     ```bash
-     java -jar target/LocalApp-1.0-SNAPSHOT.jar
-     ```
-   - The LocalApp will check if a Manager EC2 instance is running. If not, it will create one using the configured AWS credentials and S3 bucket for storing the Manager's JAR file.
+   ```bash
+   java -jar <LocalApp-1.0-SNAPSHOT.jar path> <input text file path> <output file name> <num of lines per worker> <terminate - not must>
+   ```
 
 2. **Manager on EC2**:
 
+   - The LocalApp will check if a Manager EC2 instance is running. If not, it will create one using the configured AWS credentials and S3 bucket for storing the Manager's JAR file.
    - The Manager will be automatically deployed and started on the EC2 instance created by the LocalApp.
    - It listens to SQS messages from the LocalApp and begins processing requests.
 
 3. **Workers**:
    - The Manager spawns or communicates with workers as needed. Workers handle task-specific computation based on the instructions sent by the Manager.
 
-### Example Workflow
+---
 
-- A user submits a request via the LocalApp.
-- The LocalApp sends the request to the Manager through the SQS queue.
-- The Manager receives the request, divides the workload, and communicates with Workers via separate SQS queues to process the request.
-- The Workers complete their tasks and send the results back to the Manager, which aggregates the responses and sends the final result back to the LocalApp.
+## EC2 Instance Details
+
+- **AMI**: ami-00e95a9222311e8ed
+- **Instance Type**: InstanceType.M4_LARGE
+
+### Time and Performance Metrics
+
+- **Time Taken for Execution**:
+
+  - This section will be filled after testing.
+  - Example: _The program took [X] minutes to finish working on the input files._
+
+- **Value of N**:
+
+  - This section will be filled after testing.
+  - Example: _The program was tested with [N] lines of input._
+
+  Here’s the revised **Scalability** section:
 
 ---
 
-This architecture is designed for scalability, with modular components and efficient message-passing mechanisms to handle distributed workloads.
+### **Scalability**:
+
+We've designed the program to be highly scalable, capable of handling a large number of users simultaneously. However, due to the **limited number of EC2 nodes** that we are allowed to create, the system may become slow when handling a massive influx of requests.
+
+To address scalability challenges, we ensured that no significant data resides in the EC2 nodes' memory or the users' personal computers. Instead, all persistent data and communication rely on AWS services like S3 and SQS, which are inherently scalable.
+
+The primary bottleneck arises from the potential buildup of messages in the Manager's backup queue when the workload exceeds the number of tasks it can process simultaneously. To mitigate this, we implemented a **limitation on the number of jobs** the Manager can process at a time. While this approach maintains system stability, it does mean that tasks are queued, potentially increasing wait times during peak loads.
+
+Further improvements, such as dynamically scaling EC2 instances or redistributing tasks to additional Managers, could alleviate these constraints in future iterations.
+
+---
+
+### Persistence – What if an EC2 node dies?
+
+- **If the Manager dies:**  
+   Boo hoo, the system would lose its central controller, and the operation would halt. However, we have a potential solution: implementing a **"Just In Case" queue.** This queue would store all messages received from the LocalApp that the Manager has started processing but not yet completed.
+
+  If the Manager node dies, the LocalApp would detect the failure (e.g., via timeout mechanisms). It would then create a new Manager EC2 instance. The new Manager would check the **Just In Case queue** for any unprocessed or incomplete jobs and resume processing them. This ensures the system can recover and continue its operation even after the Manager fails.
+
+- **If a Worker node dies:**  
+   This is less critical, thanks to the **visibility timeout** mechanism of SQS. When a Worker picks up a task but fails to complete it (e.g., due to a crash or disconnection), the task message becomes visible again in the **toWorker queue** after the timeout period. Another Worker can then pick up the task and complete it, ensuring no task is left unprocessed.
+
+### Using Threads for the Manager
+
+In our system, **threads** are utilized exclusively in the **Manager** component because it requires flexibility and the ability to handle multiple tasks concurrently. The Manager's role involves listening to queues, processing jobs, coordinating with workers, and managing EC2 instances. To ensure efficiency and prevent the system from becoming blocked while handling multiple requests, we employ a thread pool to manage concurrent tasks.
+
+- The **Manager** uses a thread pool to handle incoming tasks in parallel. One thread is dedicated to continuously polling the SQS queue for new messages from the LocalApp, ensuring that the Manager remains responsive to incoming requests.
+- Additional threads are responsible for handling specific tasks once a request is received. These threads manage the communication between the Manager and Workers, distributing tasks and collecting results.
+
+Using threads in the Manager enables the system to handle multiple requests simultaneously, ensuring that each request is processed independently. This approach improves the scalability of the system and prevents bottlenecks in processing.
+
+We chose not to use threads in the **LocalApp** and **Worker** components because:
+
+- The LocalApp's functionality is sequential in nature, primarily focused on submitting jobs and waiting for results, making threading unnecessary.
+- The **Workers** perform isolated tasks (e.g., processing a single file) and do not benefit from concurrent processing. Since each task is independent, parallelizing worker tasks would not provide a significant performance improvement.
