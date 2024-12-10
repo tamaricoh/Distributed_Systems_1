@@ -158,7 +158,7 @@ public class AWS {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(bucketName)
                     .key(s3Key)
-                    .acl(ObjectCannedACL.PUBLIC_READ) // Explicitly set public read access
+                    //.acl(ObjectCannedACL.PUBLIC_READ) // Explicitly set public read access
                     .build();
     
             Path path = Paths.get(input_file_path);

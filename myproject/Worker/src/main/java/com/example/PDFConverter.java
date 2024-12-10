@@ -6,13 +6,19 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Writer;
 import java.io.FileWriter;
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.UUID;
 
 public class PDFConverter {
 
@@ -52,42 +58,43 @@ public class PDFConverter {
 
     public static String convertFromUrl(String url, String operation, String localAppID, String file_location) throws IOException {
         // Generate a destination file name based on URL and localAppID
-        String destinationFile = file_location + "/" + generateFileName(url, localAppID);
+        String originalPdfPath = file_location + "/" + generateFileName(url, localAppID);
     
         // First, download the file
-        String downloadResult = downloadFile(url, destinationFile);
+        String downloadResult = downloadFile(url, originalPdfPath);
         if (downloadResult != null) {
             // If the download fails, return the error message
             return downloadResult;
         }
     
         // Proceed with the conversion after downloading the file
-        String baseFileName = destinationFile.replace(".pdf", "");
+        String baseFileName = originalPdfPath.replace(".pdf", "");
         String outputPath;
     
         try {
             switch (operation.toUpperCase()) {
                 case "TOIMAGE":
                     outputPath = baseFileName + ".png";
-                    convertToImage(destinationFile, outputPath);
+                    convertToImage(originalPdfPath, outputPath);
                     break;
                 case "TOTEXT":
                     outputPath = baseFileName + ".txt";
-                    convertToText(destinationFile, outputPath);
+                    convertToText(originalPdfPath, outputPath);
                     break;
                 case "TOHTML":
                     outputPath = baseFileName + ".html";
-                    convertToHTML(destinationFile, outputPath);
+                    convertToHTML(originalPdfPath, outputPath);
                     break;
                 default:
                     throw new IllegalArgumentException("Unsupported operation: " + operation);
             }
-    
-            // Return the URL of the output file (successful case)
-            File file = new File(destinationFile);
-            if (file.exists()) {
-                file.delete();
+
+            File originalPdfFile = new File(originalPdfPath);
+            if (originalPdfFile.exists()) {
+                originalPdfFile.delete();
             }
+    
+            // Return the path of the converted file
             return outputPath;
     
         } catch (IOException e) {
@@ -95,6 +102,27 @@ public class PDFConverter {
             return "Error: Unable to convert PDF to " + operation + ". Reason: " + e.getMessage();
         }
     }
+
+private static String performConversion(String operation, String destinationFile, String baseFileName) throws IOException {
+    String outputPath;
+    switch (operation.toUpperCase()) {
+        case "TOIMAGE":
+            outputPath = baseFileName + ".png";
+            convertToImage(destinationFile, outputPath);
+            break;
+        case "TOTEXT":
+            outputPath = baseFileName + ".txt";
+            convertToText(destinationFile, outputPath);
+            break;
+        case "TOHTML":
+            outputPath = baseFileName + ".html";
+            convertToHTML(destinationFile, outputPath);
+            break;
+        default:
+            throw new IllegalArgumentException("Unsupported operation: " + operation);
+    }
+    return outputPath;
+}
     
     /**
      * Generates a file name using the base name of the URL and localAppID.
@@ -104,37 +132,41 @@ public class PDFConverter {
      * @return A string representing the generated file name.
      */
     private static String generateFileName(String url, String localAppID) {
-        String baseName = new File(url).getName(); // Extract the file name from URL
-        if (!baseName.endsWith(".pdf")) {
-            baseName += ".pdf"; // Ensure the extension is .pdf
+        try {
+            // Use URI to handle URL encoding and special characters
+            URI uri = new URI(url);
+            String path = uri.getPath();
+            String baseName = Paths.get(path).getFileName().toString();
+            
+            // Sanitize filename to only contain lowercase letters, digits, and hyphens
+            String sanitizedName = baseName.toLowerCase()
+                .replaceAll("[^a-z0-9]", "-")  // Replace non-matching characters with hyphen
+                .replaceAll("-+", "-")         // Replace multiple consecutive hyphens with single hyphen
+                .replaceAll("(^-|-$)", "");    // Remove leading or trailing hyphens
+            
+            // Ensure .pdf extension
+            if (!sanitizedName.toLowerCase().endsWith(".pdf")) {
+                sanitizedName += ".pdf";
+            }
+            
+            // Append localAppID
+            return sanitizedName.replace(".pdf", "_" + localAppID + ".pdf");
+        } catch (URISyntaxException e) {
+            // Fallback to a safe random filename if URI parsing fails
+            return UUID.randomUUID().toString() + "_" + localAppID + ".pdf";
         }
-        return baseName.replace(".pdf", "_" + localAppID + ".pdf");
     }
 
     // Download function which returns a string indicating the result
     private static String downloadFile(String url, String destinationFile) {
-        // Check if the file exists and delete it if needed
-        File file = new File(destinationFile);
-        if (file.exists()) {
-            file.delete();
-        }
-
         try {
-            // Create a URL object from the provided URL string
             URL fileUrl = new URL(url);
-
-            // Open an input stream from the URL (i.e., downloading the file)
-            try (InputStream inputStream = fileUrl.openStream();
-                FileOutputStream fileOutputStream = new FileOutputStream(destinationFile)) {
-
-                byte[] buffer = new byte[4096];
-                int bytesRead;
-
-                while ((bytesRead = inputStream.read(buffer)) != -1) {
-                    fileOutputStream.write(buffer, 0, bytesRead);
-                }
-                System.out.println("File downloaded successfully to: " + destinationFile);
-                return null; // Indicate successful download
+            Path destination = Paths.get(destinationFile);
+            
+            // Use Files.copy with StandardCopyOption for better file handling
+            try (InputStream inputStream = fileUrl.openStream()) {
+                Files.copy(inputStream, destination, StandardCopyOption.REPLACE_EXISTING);
+                return null;
             }
         } catch (MalformedURLException e) {
             return "Error: Invalid URL format. " + e.getMessage();

@@ -10,7 +10,7 @@ public class Worker{
     private static String MANAGER_TO_WORKERS_QUEUE;
     private static String CLIENT_BUCKET;
     private static String WORKERS_TO_MANAGER_QUEUE;
-    private static String DEFAULT_DOWNLOAD_DIR = "/home/user-ec2/downloads";
+    private static String DEFAULT_DOWNLOAD_DIR = "/home/ec2-user/downloads";
     static String localAppID;
     public Boolean terminate;
     static AWS aws = AWS.getInstance();
@@ -48,7 +48,10 @@ public class Worker{
                         continue;
                     }
                     else if(!processed_file_path.contains("Error: ")){
+                        aws.sendMessage(NamingConvention.SQS_TEST, "[YARDEN] proccesed file path: " + processed_file_path);
                         output_URL = aws.uploadFileToS3(processed_file_path, CLIENT_BUCKET);
+                        aws.sendMessage(NamingConvention.SQS_TEST, "[YARDEN] proccesed file URL: " + output_URL);
+                        Thread.sleep(1000);
                         File file = new File(processed_file_path);
                         if (file.exists()) file.delete();
                     }
@@ -56,7 +59,6 @@ public class Worker{
                         output_URL = processed_file_path;
                     }
                     aws.sendMessage(WORKERS_TO_MANAGER_QUEUE, operation + " " + url + " " + output_URL);
-                    aws.sendMessage(NamingConvention.SQS_TEST,"worker sent: " + operation + " " + url + " " + output_URL + "to worker manager");
                     aws.deleteMessage(MANAGER_TO_WORKERS_QUEUE, msg.receiptHandle());
                 } catch (Exception e) {
                     System.err.println("Error while processing the task: " + e.getMessage());  
