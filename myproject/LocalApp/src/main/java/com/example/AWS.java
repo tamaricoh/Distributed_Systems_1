@@ -101,7 +101,7 @@ public class AWS {
                 .maxCount(numberOfInstances)
                 .minCount(1)
                 .keyName("vockey")
-                // .keyName("Test")
+                .keyName("Test")
                 .iamInstanceProfile(IamInstanceProfileSpecification.builder().name("LabInstanceProfile").build())
                 .userData(Base64.getEncoder().encodeToString((script).getBytes()))
                 .build();

@@ -52,13 +52,11 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SqsException;
 
-import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
-
 public class AWSManeger {
     private final S3Client s3Client;
     private final SqsClient sqsClient;
     private final Ec2Client ec2Client;
-    private int WorkerVisibilityTimeout = 5;
+    private int WorkerVisibilityTimeout = 2;
     public static String ami = "ami-00e95a9222311e8ed";
 
     public static Region region1 = Region.US_WEST_2;
@@ -83,46 +81,32 @@ public class AWSManeger {
     }
 
     /**
-     * Retrieves a message from the specified SQS queue and processes it.
-     * The message is expected to contain an operation and a URL, separated by a space.
-     * After processing, the message is deleted from the queue.
+     * Retrieves a message from the specified SQS queue with a visibility timeout.
      *
-     * @param QUEUE_NAME The name of the SQS queue to retrieve the message from.
-     * @return An array of strings where the first element is the operation and the second is the URL extracted from the message.
-     *         Returns null if no message is found or an error occurs during processing.
+     * @param queueName The URL of the SQS queue.
+     * @return The message, or null if no message is found.
      */
-    public String[] getMessage(String QUEUE_NAME) {
+    public Message getMessage(String queueName) {
         try {
-            // Create a request to receive messages
+            // Receive a single message with a visibility timeout
             ReceiveMessageRequest receiveRequest = ReceiveMessageRequest.builder()
-                    .queueUrl(getQueueUrl(QUEUE_NAME))
-                    .maxNumberOfMessages(1) // Process one message at a time
-                    .waitTimeSeconds(10) // Long polling
-                    .visibilityTimeout(WorkerVisibilityTimeout)
+                    .queueUrl(getQueueUrl(queueName))
+                    .maxNumberOfMessages(1)
+                    .waitTimeSeconds(10) // Long polling for 10 seconds
+                    .visibilityTimeout(WorkerVisibilityTimeout) // Make the message invisible to others for 10 seconds
                     .build();
 
             // Receive messages from the queue
-            ReceiveMessageResponse receiveMessageResponse = sqsClient.receiveMessage(receiveRequest);
-            List<Message> messages = receiveMessageResponse.messages();  // Explicitly declaring the type
+            List<Message> messages = sqsClient.receiveMessage(receiveRequest).messages();
 
             if (messages.isEmpty()) {
-                System.out.println("No messages in the queue: " + QUEUE_NAME);
-                return null; // No message was processed
+                System.out.println("No messages available in the queue.");
+                return null; // No message received
             }
 
-            // Process the first message
-            Message message = messages.get(0);
-            String body = message.body();
-
-            // Parse the message body (assumes the body format is fixed)
-            String[] parts = body.split(" ");
-
-            // Delete the message from the queue after processing
-            deleteMessage(QUEUE_NAME, message.receiptHandle());
-
-            return parts;
-        } catch (Exception e) {
-            System.err.println("Error while processing SQS message: " + e.getMessage());
+            return messages.get(0); // Return the first message
+        } catch (SqsException e) {
+            System.err.println("Error receiving message: " + e.awsErrorDetails().errorMessage());
             return null;
         }
     }
@@ -145,17 +129,20 @@ public class AWSManeger {
     /**
      * Deletes a message from the specified SQS queue.
      *
-     * @param queueUrl      The URL of the SQS queue.
+     * @param queueUrl     The URL of the SQS queue.
      * @param receiptHandle The receipt handle of the message to delete.
      */
     public void deleteMessage(String queueUrl, String receiptHandle) {
-        // Delete the message after processing
-        DeleteMessageRequest deleteRequest = DeleteMessageRequest.builder()
-                .queueUrl(getQueueUrl(queueUrl))
-                .receiptHandle(receiptHandle)
-                .build();
+        try {
+            DeleteMessageRequest deleteRequest = DeleteMessageRequest.builder()
+                    .queueUrl(queueUrl)
+                    .receiptHandle(receiptHandle)
+                    .build();
 
-        sqsClient.deleteMessage(deleteRequest);
+            sqsClient.deleteMessage(deleteRequest);
+        } catch (SqsException e) {
+            System.err.println("Error deleting message: " + e.awsErrorDetails().errorMessage());
+        }
     }
 
     /**
