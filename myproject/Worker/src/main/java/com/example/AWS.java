@@ -1,8 +1,6 @@
 package com.example;
 
 import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.nio.file.Path;
@@ -15,6 +13,7 @@ import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.TerminateInstancesRequest;
 import software.amazon.awssdk.services.ec2.model.TerminateInstancesResponse;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.ObjectCannedACL;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
@@ -23,8 +22,7 @@ import software.amazon.awssdk.services.sqs.model.GetQueueUrlResponse;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SqsException;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sqs.model.Message;
 
@@ -114,7 +112,6 @@ public class AWS {
                     .build();
 
             sqsClient.deleteMessage(deleteRequest);
-            System.err.println("Message deleted");
         } catch (SqsException e) {
             System.err.println("Error deleting message: " + e.awsErrorDetails().errorMessage());
         }
@@ -154,27 +151,22 @@ public class AWS {
         return getQueueUrlResponse.queueUrl();
     }
 
-    /**
-     * Uploads a file to S3 and returns the object key.
-     *
-     * @param input_file_path Local path of the file to upload.
-     * @param bucketName    Name of the S3 bucket.
-     * @return The key of the uploaded file in S3, or null if the upload fails.
-     * @throws IOException If an I/O error occurs.
-     */
     public String uploadFileToS3(String input_file_path, String bucketName) {
         String s3Key = Paths.get(input_file_path).getFileName().toString();
-
+    
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(bucketName)
                     .key(s3Key)
+                    .acl(ObjectCannedACL.PUBLIC_READ) // Explicitly set public read access
                     .build();
-
+    
             Path path = Paths.get(input_file_path);
-            getInstance().s3Client.putObject(putObjectRequest, path);
+            getInstance().s3Client.putObject(putObjectRequest, RequestBody.fromFile(path));
             System.out.println("File uploaded successfully to S3: " + s3Key);
-            return "s3://" + bucketName + "/" + s3Key;
+    
+            // Return the public URL of the uploaded file
+            return "https://" + bucketName + ".s3." + region1 + ".amazonaws.com/" + s3Key;
         } catch (Exception e) {
             System.err.println("Unexpected error during file upload: " + e.getMessage());
             return null;

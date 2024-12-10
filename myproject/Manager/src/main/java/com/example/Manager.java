@@ -9,6 +9,7 @@ import java.util.Iterator;
 
 
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 public class Manager {
 
@@ -43,7 +44,7 @@ public class Manager {
 
     // Submit tasks to the thread pool
     public void submitTask(Runnable task) {
-        threadPool.submit(task);
+        this.threadPool.submit(task);
     }
 
     public int getAvailableWorkers() {
@@ -107,19 +108,30 @@ public class Manager {
         Manager manager = new Manager(args[0]);  // Create Manager instance with thread pool
         
         // Create and start the localAppThread (which will run ManagerLocalRun)
-        Thread localAppThread = new Thread(new ManagerLocalRun(manager));
-        localAppThread.start();
+        //Thread localAppThread = new Thread(new ManagerLocalRun(manager));
+        //localAppThread.start();
 
         try {
-            localAppThread.join();  // Wait for the localAppThread to finish
+            // Create an instance of ManagerLocalRun
+            ManagerLocalRun managerTask = new ManagerLocalRun(manager);
+
+            // Submit the ManagerLocalRun instance to the thread pool
+            manager.threadPool.submit(managerTask);
+
+            // Ensure all threads complete
+            manager.threadPool.shutdown(); // Stop accepting new tasks
+            if (!manager.threadPool.awaitTermination(10, TimeUnit.MINUTES)) { // Adjust timeout as needed
+                System.err.println("Thread pool did not terminate in the specified time.");
+                manager.threadPool.shutdownNow(); // Force shutdown if necessary
+            }
+
+            // Continue with further logic
+            System.out.println("All threads in the thread pool have finished.");
+            manager.shutdown();
         } catch (InterruptedException e) {
-            System.err.println("Main thread interrupted: " + e.getMessage());
+            System.err.println("Main thread interrupted while waiting for thread pool termination.");
+            manager.threadPool.shutdownNow(); // Force shutdown in case of interruption
+            manager.shutdown();
         }
-
-        System.out.println("All threads completed, exiting program.");
-
-        // Shut down the thread pool after use
-        manager.shutdown();
     }
-
 }

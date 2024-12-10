@@ -13,7 +13,6 @@ import java.util.Base64;
 import java.util.List;
 
 import software.amazon.awssdk.core.ResponseInputStream;
-import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.CreateTagsRequest;
@@ -36,7 +35,10 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
+import software.amazon.awssdk.services.s3.model.PublicAccessBlockConfiguration;
+import software.amazon.awssdk.services.s3.model.PutBucketPolicyRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutPublicAccessBlockRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.sqs.SqsClient;
@@ -49,15 +51,14 @@ import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SqsException;
-import software.amazon.awssdk.services.sqs.model.Message;
-import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
+
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
 
 public class AWSManeger {
     private final S3Client s3Client;
     private final SqsClient sqsClient;
     private final Ec2Client ec2Client;
-    private int WorkerVisibilityTimeout = 10;
+    private int WorkerVisibilityTimeout = 5;
     public static String ami = "ami-00e95a9222311e8ed";
 
     public static Region region1 = Region.US_WEST_2;
@@ -256,8 +257,8 @@ public class AWSManeger {
                 .imageId(ami)
                 .maxCount(numberOfInstances)
                 .minCount(1)
-                // .keyName("vockey")
-                .keyName("Test")
+                .keyName("vockey")
+                //.keyName("testing")
                 .iamInstanceProfile(IamInstanceProfileSpecification.builder().name("LabInstanceProfile").build())
                 .userData(Base64.getEncoder().encodeToString((script).getBytes()))
                 .build();
@@ -309,7 +310,7 @@ public class AWSManeger {
     
             // Execute the JAR with LocalAppID as an argument
             "echo \"Running the Worker application...\"",
-            // "java -jar ./worker.jar " + localAppId + " > $WORK_DIR/app.log 2>&1 &", // Pass LocalAppID to the JAR // TAMAR
+            "java -jar ./worker.jar " + localAppId + " > $WORK_DIR/app.log 2>&1 &", // Pass LocalAppID to the JAR // TAMAR
     
             "echo \"Worker setup complete\""
         );
@@ -338,25 +339,52 @@ public class AWSManeger {
      * @param bucketName Name of the bucket to create.
      */
     public void createBucketIfNotExists(String bucketName) {
-        try {
-            // Create the bucket with the specified configuration
-            s3Client.createBucket(CreateBucketRequest
-                    .builder()
-                    .bucket(bucketName)
-                    .createBucketConfiguration(
-                            CreateBucketConfiguration.builder()
-                                    .locationConstraint(BucketLocationConstraint.US_WEST_2)
-                                    .build())
-                    .build());
+    try {
+        // Create the bucket with public access settings
+        s3Client.createBucket(CreateBucketRequest
+                .builder()
+                .bucket(bucketName)
+                .createBucketConfiguration(
+                        CreateBucketConfiguration.builder()
+                                .locationConstraint(BucketLocationConstraint.US_WEST_2)
+                                .build())
+                .build());
 
-            // Wait until the bucket exists
-            s3Client.waiter().waitUntilBucketExists(HeadBucketRequest.builder()
-                    .bucket(bucketName)
-                    .build());
-        } catch (S3Exception e) {
-            System.out.println(e.getMessage());
-        }
+        // Wait until the bucket exists
+        s3Client.waiter().waitUntilBucketExists(HeadBucketRequest.builder()
+                .bucket(bucketName)
+                .build());
+
+        // Set bucket policy to allow public read access
+        String bucketPolicy = "{\"Version\":\"2012-10-17\"," +
+                "\"Statement\":[{" +
+                "\"Sid\":\"PublicReadGetObject\"," +
+                "\"Effect\":\"Allow\"," +
+                "\"Principal\":\"*\"," +
+                "\"Action\":\"s3:GetObject\"," +
+                "\"Resource\":\"arn:aws:s3:::" + bucketName + "/*\"" +
+                "}]}";
+
+        s3Client.putBucketPolicy(PutBucketPolicyRequest.builder()
+                .bucket(bucketName)
+                .policy(bucketPolicy)
+                .build());
+
+        // Disable block public access settings
+        s3Client.putPublicAccessBlock(PutPublicAccessBlockRequest.builder()
+                .bucket(bucketName)
+                .publicAccessBlockConfiguration(PublicAccessBlockConfiguration.builder()
+                        .blockPublicAcls(false)
+                        .blockPublicPolicy(false)
+                        .ignorePublicAcls(false)
+                        .restrictPublicBuckets(false)
+                        .build())
+                .build());
+
+    } catch (S3Exception e) {
+        System.out.println("Error creating public bucket: " + e.getMessage());
     }
+}
 
     /**
      * Creates an SQS queue with the specified name.
