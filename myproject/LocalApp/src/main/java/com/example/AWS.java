@@ -1,8 +1,10 @@
 package com.example;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Base64;
 import java.util.List;
 import software.amazon.awssdk.services.ec2.Ec2Client;
@@ -22,6 +24,7 @@ import software.amazon.awssdk.services.s3.model.BucketLocationConstraint;
 import software.amazon.awssdk.services.s3.model.CreateBucketConfiguration;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
@@ -37,6 +40,7 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageResponse;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SqsException;
+import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.model.Tag;
 import software.amazon.awssdk.services.ec2.model.Filter;
@@ -308,24 +312,43 @@ public class AWS {
      * @return true if the download is successful, false otherwise.
      * @throws IOException If an I/O error occurs during the file save process.
      */
-    public boolean downloadFileFromS3(String bucketName, String fileKey, String outputFilePath) {
-        try {
-            // Create a GetObjectRequest to specify the bucket and key
-            GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                    .bucket(bucketName)
-                    .key(fileKey)
-                    .build();
+    public Path downloadFileFromS3(String BUCKET_NAME, String fileKey, String outputFilePath) {
+    try {
+        // Create a GetObject request
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(BUCKET_NAME)
+                .key(fileKey)
+                .build();
 
-            // Perform the file download
-            getInstance().s3.getObject(getObjectRequest, Paths.get(outputFilePath));
+        // Specify the local file path to download the file to
+        Path destinationPath = Paths.get(outputFilePath);
 
-            System.out.println("File downloaded successfully from S3: " + fileKey + " to " + outputFilePath);
-            return true;
-        } catch (Exception e) {
-            System.err.println("Unexpected error during file download: " + e.getMessage());
-            return false;
+        // Download the file from S3 to an input stream
+        ResponseInputStream<GetObjectResponse> s3Object = s3.getObject(getObjectRequest);
+
+        // Write the file to the local destination
+        Files.copy(s3Object, destinationPath, StandardCopyOption.REPLACE_EXISTING);
+
+        // Ensure the file was successfully downloaded
+        if (Files.exists(destinationPath)) {
+            System.out.println("File downloaded successfully from S3 to: " + destinationPath);
+            return destinationPath;
+        } else {
+            System.err.println("File download failed, file not found at the destination.");
+            return null;
         }
+    } catch (S3Exception e) {
+        System.err.println("Error downloading file from S3: " + e.getMessage());
+        return null;
+    } catch (IOException e) {
+        System.err.println("Error writing file to local system: " + e.getMessage());
+        return null;
+    } catch (Exception e) {
+        System.err.println("Unexpected error: " + e.getMessage());
+        return null;
     }
+}
+
 
     /**
  * Uploads a JAR file to an S3 bucket if it does not already exist in the bucket.

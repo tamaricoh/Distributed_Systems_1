@@ -31,6 +31,9 @@ public class HTMLConverter {
     * @param line - a string array of format [operation, url, newUrl]
     */
     private static String addResponseToHtml(String[] line) {
+        System.err.println(line[0] +"-------------");
+        System.err.println(line[1] +"-------------");
+        System.err.println(line[2] +"-------------");
         StringBuilder responseHtml = new StringBuilder();
         responseHtml.append("<li>\n");
         responseHtml.append("<strong>").append(line[0]).append("</strong>: ");
@@ -79,7 +82,8 @@ public class HTMLConverter {
             String line;
             // Iterate over each line of the input file
             while ((line = reader.readLine()) != null) {
-                String[] parts = line.split(",\\s*");
+                String[] parts = line.split(" ");
+                System.out.println(line);
                 writer.write(addResponseToHtml(parts));
             }
             writer.write(buildHtmlFooter());
