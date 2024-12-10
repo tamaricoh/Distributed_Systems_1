@@ -120,6 +120,8 @@ Further improvements, such as dynamically scaling EC2 instances or redistributin
 - **If a Worker node dies:**  
    This is less critical, thanks to the **visibility timeout** mechanism of SQS. When a Worker picks up a task but fails to complete it (e.g., due to a crash or disconnection), the task message becomes visible again in the **toWorker queue** after the timeout period. Another Worker can then pick up the task and complete it, ensuring no task is left unprocessed.
 
+---
+
 ### Using Threads for the Manager
 
 In our system, **threads** are utilized exclusively in the **Manager** component because it requires flexibility and the ability to handle multiple tasks concurrently. The Manager's role involves listening to queues, processing jobs, coordinating with workers, and managing EC2 instances. To ensure efficiency and prevent the system from becoming blocked while handling multiple requests, we employ a thread pool to manage concurrent tasks.
