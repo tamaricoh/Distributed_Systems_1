@@ -57,18 +57,14 @@ public class ManagerWorkerRun implements Runnable {
             else { // message is valid
                 messagesArray[numOfCompletedTasks] = msg.body(); // Store message in array
                 numOfCompletedTasks++;
-                System.out.println("Message added to array: " + msg.body());
                 aws.deleteMessage(WORKERS_TO_MANAGER_QUEUE_NAME + localAppID, msg.receiptHandle());
             }
-            System.out.println("numOfCompletedTasks: " + numOfCompletedTasks + " numOfTasks: " + numOfTasks);
             try {
                 Thread.sleep(2000);
-                System.out.println("no messages in Q");
             } catch (InterruptedException e) {
                 continue;
             }
             if (numOfCompletedTasks == numOfTasks) {
-                System.out.println("Creating summery file ");
                 String filePath = createSummaryFile();
                 if (filePath != null) {
                     System.out.println("created summery file at: " + filePath);
@@ -85,20 +81,7 @@ public class ManagerWorkerRun implements Runnable {
                 }
             }
         }
-        String file_path = createSummaryFile();
-        if (file_path != null) {
-            String s3Key = aws.uploadFileToS3(file_path, CLIENT_BUCKET);
-            if (s3Key != null) {
-                System.out.println("File successfully uploaded to S3. S3 Key: " + s3Key);
-                aws.sendSQSMessage(s3Key, MANAGER_TO_LOCALAPP_QUEUE_NAME);
-                terminateWorkers();
-                deleteReasources(false);
-                removeClient();
-            } else {
-                System.err.println("Error uploading file to S3.");
-            }
-        }
-            System.out.println("All tasks processed. Total messages: " + numOfCompletedTasks);
+        
     }
         
     private void terminateWorkers() {
@@ -106,20 +89,13 @@ public class ManagerWorkerRun implements Runnable {
         for(int i =0; i<active_workers ; i++){
             aws.sendSQSMessage("terminate", MANAGER_TO_WORKERS_QUEUE_NAME + localAppID);
         }
-        int instances = active_workers;
-        //wait for all workers to shut down
-        while(active_workers>0){
-            Message msg = aws.getMessage(WORKERS_TO_MANAGER_QUEUE_NAME + localAppID);
-            if(msg != null && msg.body().contentEquals("terminating")){
-                active_workers--;
-            }
-            else{
-                continue;
-            }
+        try {
+            Thread.sleep(10000);
+        } catch (Exception e) {
+            this.manager.availableWorkers.addAndGet(active_workers);
+            aws.sendSQSMessage("test", "active workers are: " + this.manager.availableWorkers.get());
+            terminate = true;
         }
-        //update avilable workers
-        this.manager.availableWorkers.addAndGet(instances);
-        terminate = true;
     }
 
     private void deleteReasources(Boolean delete_bucket) {

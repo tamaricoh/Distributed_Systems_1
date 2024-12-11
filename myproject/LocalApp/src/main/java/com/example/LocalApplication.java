@@ -3,16 +3,15 @@ package com.example;
 import java.io.File;
 
 public class LocalApplication{
-    private static String MANAGER_JAR = "/home/yarden/Distributed_Systems_1/myproject/Manager/target/Manager-1.0-SNAPSHOT.jar";
-    private static String WORKER_JAR = "/home/yarden/Distributed_Systems_1/myproject/Worker/target/Worker-1.0-SNAPSHOT.jar";
-    private static String EC2_BUCKET = "jar-bucket-103";
-    private static String FILES_BUCKET = "text-file-bucket-103";
-    static String SQS_CLIENT = "localapp-to-manager";
-    static String SQS_READY = "manager-to-localapp";
-    static String SQS_TEST= "test";
+    private static String MANAGER_JAR = NamingConvention.MANAGER_JAR_PATH;
+    private static String WORKER_JAR = NamingConvention.WORKER_JAR_PATH;
+    private static String EC2_BUCKET = NamingConvention.JAR_BUCKET;
+    private static String FILES_BUCKET = NamingConvention.UPLOAD_FILE_BUCKET;
+    static String SQS_CLIENT = NamingConvention.LOCAL_MANAGER_SQS;
+    static String SQS_READY = NamingConvention.MANAGER_LOCAL_SQS;
 
     static AWS aws = AWS.getInstance();
-    static String dilimeter = " ";
+    static String dilimeter = NamingConvention.dilimeter;
 
     // Method to process the file
     public static void processFile(String input_file_path, String output_file_path) {
@@ -40,7 +39,7 @@ public class LocalApplication{
         aws.createBucketIfNotExists(FILES_BUCKET);
         aws.createSqsQueue(SQS_CLIENT);
         aws.createSqsQueue(SQS_READY);
-        aws.createSqsQueue(SQS_TEST);
+        aws.createSqsQueue(NamingConvention.SQS_TEST);
     }
     
     public static void initalizeManager(){
@@ -97,7 +96,7 @@ public class LocalApplication{
                 System.out.println("Server is shutting down, please try again later...");
                 System.exit(0);
             }
-            if(aws.downloadFileFromS3(FILES_BUCKET, file_key_S3, output_file_path + ".txt")){
+            if(aws.downloadFileFromS3(FILES_BUCKET, file_key_S3, output_file_path + ".txt") != null){
                 processFile(output_file_path + ".txt", output_file_path + ".html");
             }
             else{

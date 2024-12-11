@@ -114,11 +114,9 @@ public class ManagerLocalRun implements Runnable {
      */
     private int bootstrap(int numOfWorkers, String LocalAppID) {
         aws.createBucketIfNotExists(NamingConvention.BASE_CLIENT_BUCKET + LocalAppID);
-        
         if (manager.getAvailableWorkers() > 0 && numOfWorkers > 0){
             numOfWorkers = Math.min(numOfWorkers, manager.getAvailableWorkers());
             manager.availableWorkers.addAndGet(-numOfWorkers);
-            System.out.println("TAMAR " + numOfWorkers);
             for (int i = 0 ; i < numOfWorkers; i++){
                 initializeWorker("worker-"+LocalAppID, 1, LocalAppID);
             }
@@ -172,7 +170,11 @@ public class ManagerLocalRun implements Runnable {
         }
         aws.deleteBucket(CLIENT_BUCKET);
         aws.deleteQueue(LOCALAPP_TO_MANAGER_QUEUE_NAME);
-        while(manager.availableWorkers.get() < manager.MAX_WORKERS || manager.getThreadCount() > 0){
+        try {
+            Thread.sleep(15000);
+        } catch (Exception e) {
+        }
+        while(manager.getThreadCount() > 1){
             try {
                 Thread.sleep(5000);
             } catch (Exception e) {
