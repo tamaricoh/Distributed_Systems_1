@@ -33,7 +33,7 @@ public class AWS {
     private final Ec2Client ec2Client;
     private static final String INSTANCE_METADATA_URL = "http://169.254.169.254/latest/meta-data/instance-id";
     public static String ami = "ami-00e95a9222311e8ed";
-    private int WorkerVisibilityTimeout = 2;
+    private int WorkerVisibilityTimeout = 10;
     public static Region region1 = Region.US_WEST_2;
     public static Region region2 = Region.US_EAST_1;
     private static final AWS instance = new AWS();
@@ -171,6 +171,7 @@ public class AWS {
             return "Error: Unexpected error during file upload " + e.getMessage();
         }
     }
+    
     
     public void shutdown() {
         String instanceId = getInstanceId();

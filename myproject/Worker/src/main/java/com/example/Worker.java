@@ -29,7 +29,6 @@ public class Worker{
     public void startWorker() {
         while(!this.terminate){
             Message msg = aws.getMessage(MANAGER_TO_WORKERS_QUEUE);
-            // String msg = "ToImage http://www.bethelnewton.org/images/Passover_Guide_BOOKLET.pdf";
             if (msg != null){
                 try{
                     String task = msg.body();
@@ -49,7 +48,9 @@ public class Worker{
                     }
                     else if(!processed_file_path.contains("Error: ")){
                         output_URL = aws.uploadFileToS3(processed_file_path, CLIENT_BUCKET);
-                        Thread.sleep(1000);
+                        try {
+                            Thread.sleep(1000);
+                        } catch (Exception e) {}
                         File file = new File(processed_file_path);
                         if (file.exists()) file.delete();
                     }
@@ -57,7 +58,6 @@ public class Worker{
                         output_URL = processed_file_path.replaceAll("\\s", "_");
                     }
                     aws.sendMessage(WORKERS_TO_MANAGER_QUEUE, operation + " " + url + " " + output_URL);
-                    aws.sendMessage(NamingConvention.SQS_TEST, operation + " " + url + " " + output_URL);
                     aws.deleteMessage(MANAGER_TO_WORKERS_QUEUE, msg.receiptHandle());
                 } catch (Exception e) {
                     System.err.println("Error while processing the task: " + e.getMessage());  
@@ -103,9 +103,7 @@ public class Worker{
 
     public static void main(String[] args){
         Worker worker = new Worker(args[0]);
-        aws.sendMessage(NamingConvention.SQS_TEST, "worker running on ec2...");
         worker.startWorker();
-        aws.sendMessage(WORKERS_TO_MANAGER_QUEUE, "terminating");
         aws.shutdown();
     }
 }

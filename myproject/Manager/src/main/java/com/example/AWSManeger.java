@@ -129,13 +129,13 @@ public class AWSManeger {
     /**
      * Deletes a message from the specified SQS queue.
      *
-     * @param queueUrl     The URL of the SQS queue.
+     * @param queueName     The name of the SQS queue.
      * @param receiptHandle The receipt handle of the message to delete.
      */
-    public void deleteMessage(String queueUrl, String receiptHandle) {
+    public void deleteMessage(String queueName, String receiptHandle) {
         try {
             DeleteMessageRequest deleteRequest = DeleteMessageRequest.builder()
-                    .queueUrl(queueUrl)
+                    .queueUrl(getQueueUrl(queueName))
                     .receiptHandle(receiptHandle)
                     .build();
 
@@ -192,8 +192,6 @@ public class AWSManeger {
         return null;
     }
 }
-
-    
 
     /**
      * Uploads a file to S3 and returns the object key.
@@ -425,7 +423,6 @@ public class AWSManeger {
                         .delete(delete -> delete.objects(o -> o.key(object.key())))
                         .build();
                     s3Client.deleteObjects(deleteObjectsRequest);
-                    System.out.println("Deleted object: " + object.key());
                 }
             }
 
@@ -435,14 +432,19 @@ public class AWSManeger {
                 .build();
             
             s3Client.deleteBucket(deleteBucketRequest);
-            System.out.println("Bucket " + bucketName + " has been deleted successfully.");
-
         } catch (Exception e) {
             // Catch any exceptions that occur during the delete process and print the error message
             System.err.println("Error deleting bucket: " + e.getMessage());
         }
     }
 
+    /**
+     * Shuts down an EC2 instance by terminating it.
+     * This method retrieves the instance ID, creates a termination request, 
+     * and executes it. It prints the instance ID and its current state upon 
+     * successful termination. If an error occurs during the termination 
+     * process, the exception is caught and an error message is logged.
+     */
     public void shutdown() {
         String instanceId = getInstanceId();
         try {
@@ -461,6 +463,15 @@ public class AWSManeger {
         }
     }
 
+    /**
+     * Retrieves the instance ID of the current EC2 instance.
+     * This method makes an HTTP GET request to the EC2 instance metadata service
+     * to fetch the instance ID. If the request is successful, the instance ID is
+     * returned. If the request fails or an error occurs, a runtime exception is thrown.
+     * 
+     * @return The instance ID as a string.
+     * @throws RuntimeException if the instance ID cannot be fetched or an error occurs.
+     */
     public static String getInstanceId() {
         try {
             URL url = new URL("http://169.254.169.254/latest/meta-data/instance-id");
