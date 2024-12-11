@@ -13,7 +13,7 @@ public class Manager {
     public final int MAX_WORKERS = 8;
     private static final int THREAD_POOL_SIZE = 5;
     public ExecutorService threadPool;
-    public AtomicInteger availableWorkers = new AtomicInteger(MAX_WORKERS);
+    public volatile AtomicInteger availableWorkers = new AtomicInteger(MAX_WORKERS);
     private final Queue<String> userQueue = new LinkedList<>();
     private final Semaphore machineSem = new Semaphore(1);
     static AWSManeger aws = AWSManeger.getInstance();
@@ -21,7 +21,6 @@ public class Manager {
     public String WORKER_JAR;
 
     public Manager(String jar) {
-        // Initialize the thread pool with a fixed size of 5
         threadPool = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
         WORKER_JAR = jar;
     }

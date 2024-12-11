@@ -15,6 +15,7 @@ public class NamingConvention {
     public static  String WORKERS_TO_MANAGER_SQS = "workers-to-manager-103-";
     public static String LOCAL_MANAGER_SQS = "localapp-to-manager";
     public static String MANAGER_LOCAL_SQS = "manager-to-localapp";
+    public static String SQS_TEST= "test";
     public static String dilimeter = " ";
 
 

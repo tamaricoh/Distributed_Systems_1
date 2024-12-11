@@ -90,12 +90,11 @@ public class ManagerWorkerRun implements Runnable {
             aws.sendSQSMessage("terminate", MANAGER_TO_WORKERS_QUEUE_NAME + localAppID);
         }
         try {
-            Thread.sleep(10000);
-        } catch (Exception e) {
-            this.manager.availableWorkers.addAndGet(active_workers);
-            aws.sendSQSMessage("test", "active workers are: " + this.manager.availableWorkers.get());
-            terminate = true;
-        }
+            Thread.sleep(7000);
+        } catch (Exception e) {}
+        this.manager.availableWorkers.addAndGet(active_workers);
+        aws.sendSQSMessage("active workers are: " + this.manager.availableWorkers.get(), NamingConvention.SQS_TEST);
+        terminate = true;
     }
 
     private void deleteReasources(Boolean delete_bucket) {

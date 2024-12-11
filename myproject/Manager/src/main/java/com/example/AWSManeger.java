@@ -56,7 +56,7 @@ public class AWSManeger {
     private final S3Client s3Client;
     private final SqsClient sqsClient;
     private final Ec2Client ec2Client;
-    private int WorkerVisibilityTimeout = 2;
+    private int WorkerVisibilityTimeout = 60;
     public static String ami = "ami-00e95a9222311e8ed";
 
     public static Region region1 = Region.US_WEST_2;
@@ -165,7 +165,8 @@ public class AWSManeger {
                 .build();
 
         // Specify the local file path to download the file to
-        Path destinationPath = Paths.get("downloaded-file");
+
+        Path destinationPath = Paths.get("downloaded-file-" + s3Location);
 
         // Download the file from S3 to an input stream
         ResponseInputStream<GetObjectResponse> s3Object = s3Client.getObject(getObjectRequest);

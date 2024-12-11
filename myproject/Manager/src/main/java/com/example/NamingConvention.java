@@ -16,7 +16,7 @@ public class NamingConvention {
     public static String LOCAL_MANAGER_SQS = "localapp-to-manager";
     public static String MANAGER_LOCAL_SQS = "manager-to-localapp";
     public static String SQS_TEST= "test";
-    private static String dilimeter = " ";
+    public static String dilimeter = " ";
 
 
     public static String parse_message(String[] message_parts){

@@ -42,34 +42,38 @@ public class ManagerLocalRun implements Runnable {
                 terminate();
                 break;
             }
+            aws.deleteMessage(LOCALAPP_TO_MANAGER_QUEUE_NAME, msg.receiptHandle());
             String[] parts = message.split(" ");
             String s3Location = parts[0];
             int linesPerWorker = Integer.parseInt(parts[1]);
             String LocalAppID = String.valueOf(manager.addLocal());
-
             Path path = aws.downloadFileFromS3(s3Location, CLIENT_BUCKET);
+
             if (path != null) {
                 int numOfTasks = readFile(path, linesPerWorker, LocalAppID);
                 if (numOfTasks != -1){
                     int active_workers = bootstrap(numOfTasks/linesPerWorker, LocalAppID);
-                    System.out.println("[YARDEN] active workers count: " + active_workers);
+                    aws.sendSQSMessage("[YARDEN] active workers count: " + active_workers, NamingConvention.SQS_TEST);
                     if (active_workers > 0){
                         ManagerWorkerRun workerTask = new ManagerWorkerRun(active_workers, numOfTasks, LocalAppID, manager, s3Location);
                         addClient(LocalAppID);
                         manager.submitTask(workerTask);
                     }
                     else{
-                        System.out.println("[YARDEN] failed to hand out workers");
+                        aws.sendSQSMessage("[YARDEN] failed to hand out workers", NamingConvention.SQS_TEST);
                         aws.sendSQSMessage(s3Location + " " + linesPerWorker, LOCALAPP_TO_MANAGER_QUEUE_NAME);
                     }
                 }
             }
             aws.deleteMessage(LOCALAPP_TO_MANAGER_QUEUE_NAME, msg.receiptHandle());
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {}
         }
     }
 
     private String parseMessage(String operation, String url) {
-        return operation + " " + url;
+        return operation + NamingConvention.dilimeter + url;
     }
 
     /**
